@@ -715,6 +715,31 @@ sidebarNav.addEventListener("mouseleave", () => {
   sidebarNav.classList.remove("hover-peek");
 });
 
+// ===== Floating chat (Messenger-style bubble/window, persisted, defaults collapsed) =====
+const FLOATING_CHAT_KEY = "trackline_floating_chat_open";
+const floatingChat = document.getElementById("floatingChat");
+function setFloatingChatOpen(open) {
+  localStorage.setItem(FLOATING_CHAT_KEY, open ? "1" : "0");
+  floatingChat.classList.toggle("open", open);
+}
+setFloatingChatOpen(localStorage.getItem(FLOATING_CHAT_KEY) === "1");
+document.getElementById("floatingChatBubble").addEventListener("click", () => setFloatingChatOpen(true));
+document.getElementById("floatingChatMinimize").addEventListener("click", () => setFloatingChatOpen(false));
+
+// ===== Auto-hide header group on scroll (hide on scroll-down, reveal on scroll-up) =====
+(function initHeaderAutoHide() {
+  const headerGroup = document.getElementById("appHeaderGroup");
+  const canvasEl = document.querySelector(".canvas");
+  if (!headerGroup || !canvasEl) return;
+  let lastScrollTop = 0;
+  canvasEl.addEventListener("scroll", () => {
+    const st = canvasEl.scrollTop;
+    if (st > lastScrollTop && st > 40) headerGroup.classList.add("header-hidden");
+    else if (st < lastScrollTop) headerGroup.classList.remove("header-hidden");
+    lastScrollTop = st <= 0 ? 0 : st;
+  });
+})();
+
 // ===== Sample loaders =====
 document.querySelectorAll("[data-sample]").forEach((btn) => { btn.addEventListener("click", () => loadSample(btn.dataset.sample)); });
 function loadSample(kind) {
@@ -2498,11 +2523,29 @@ async function triggerPropagationCheck(description) {
   }
 }
 
+function showThinkingIndicator() {
+  CHAT_MOUNTS.forEach((m) => {
+    const container = document.getElementById(m.log);
+    if (!container) return;
+    const el = document.createElement("div");
+    el.className = "msg-thinking";
+    el.id = `${m.log}-thinking`;
+    el.innerHTML = "<span></span><span></span><span></span>";
+    container.appendChild(el);
+    container.scrollTop = container.scrollHeight;
+  });
+}
+function hideThinkingIndicator() {
+  CHAT_MOUNTS.forEach((m) => {
+    const el = document.getElementById(`${m.log}-thinking`);
+    if (el) el.remove();
+  });
+}
 async function sendChatMessage(text) {
   addMessage("user", text);
   history.push({ role: "user", content: text });
   CHAT_MOUNTS.forEach((m) => { const btn = document.getElementById(m.send); if (btn) btn.disabled = true; });
-  setTicker("ASSISTANT THINKING…", true);
+  showThinkingIndicator();
   try {
     const trimmedHistory = history.slice(-MAX_API_HISTORY);
     const projects = loadAllProjects();
@@ -2523,6 +2566,7 @@ async function sendChatMessage(text) {
     setTicker("SYSTEM ERROR · REQUEST FAILED");
   } finally {
     CHAT_MOUNTS.forEach((m) => { const btn = document.getElementById(m.send); if (btn) btn.disabled = false; });
+    hideThinkingIndicator();
   }
 }
 CHAT_MOUNTS.forEach((m) => {
@@ -2573,13 +2617,14 @@ document.getElementById("brandHome").addEventListener("click", () => { persistAc
 // ===== API key status check =====
 (async function checkStatus() {
   const dot = document.getElementById("apiDot");
+  const dotBubble = document.getElementById("apiDotBubble");
   const text = document.getElementById("apiStatusText");
   try {
     const res = await fetch("/api/chat", { method: "GET" });
     const data = await res.json();
-    if (data.configured) { dot.classList.add("ok"); text.textContent = "Assistant online"; }
-    else { dot.classList.add("bad"); text.textContent = "API key missing"; }
-  } catch { dot.classList.add("bad"); text.textContent = "Server unreachable"; }
+    if (data.configured) { dot.classList.add("ok"); dotBubble.classList.add("ok"); text.textContent = "Assistant online"; }
+    else { dot.classList.add("bad"); dotBubble.classList.add("bad"); text.textContent = "API key missing"; }
+  } catch { dot.classList.add("bad"); dotBubble.classList.add("bad"); text.textContent = "Server unreachable"; }
 })();
 
 // ===== Boot =====

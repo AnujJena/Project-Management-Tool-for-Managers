@@ -299,9 +299,9 @@
 </aside>
 
 <div class="app-main-col">
+<div class="app-header-group" id="appHeaderGroup">
 <header class="topbar">
   <div class="brand" id="brandHome" role="button" tabindex="0" title="Back to home"><span class="brand-mark">⚙</span><span class="brand-name">TRACKLINE</span></div>
-  <div class="status-chip" id="apiStatus"><span class="dot" id="apiDot"></span><span id="apiStatusText">Checking key…</span></div>
 </header>
 <div class="hazard-strip"></div>
 
@@ -315,6 +315,7 @@
 </div>
 
 <div class="ticker" id="ticker"><span class="ticker-text" id="tickerText">SYSTEM READY · ASK THE ASSISTANT TO PLAN, TRACK, OR CHART YOUR PROJECT</span></div>
+</div>
 
 <main class="layout">
   <section class="canvas">
@@ -586,19 +587,30 @@
 
   </section>
 
-  <aside class="copilot">
+</main>
+</div>
+</div>
+
+<div class="floating-chat" id="floatingChat">
+  <button class="floating-chat-bubble" id="floatingChatBubble" title="Open PM Assistant" aria-label="Open PM Assistant">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M4 5h16v11H8l-4 4V5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+    <span class="floating-chat-bubble-label">PM Assistant</span>
+    <span class="dot" id="apiDotBubble"></span>
+  </button>
+  <div class="floating-chat-window" id="floatingChatWindow">
     <div class="copilot-head">
       <span class="copilot-title">PM Assistant</span>
-      <span class="copilot-hint">Answers PM questions · can update several tabs from one request</span>
+      <div class="copilot-head-right">
+        <span class="status-chip" id="apiStatus"><span class="dot" id="apiDot"></span><span id="apiStatusText">Checking key…</span></span>
+        <button class="floating-chat-minimize" id="floatingChatMinimize" title="Minimize" aria-label="Minimize chat">─</button>
+      </div>
     </div>
     <div class="chat-log" id="chatLog"></div>
     <form class="chat-input-row" id="chatForm">
       <textarea id="chatInput" placeholder="Ask a PM question, or describe/edit anything…" rows="2"></textarea>
       <button type="submit" id="chatSend">Send</button>
     </form>
-  </aside>
-</main>
-</div>
+  </div>
 </div>
 
 <!-- ===================== NEW PROJECT MODAL ===================== -->
