@@ -168,7 +168,7 @@ const SAMPLES = {
 };
 
 // ===== Page navigation =====
-function showPage(id) { PAGES.forEach((pid) => { document.getElementById(pid).style.display = pid === id ? "block" : "none"; }); }
+function showPage(id) { PAGES.forEach((pid) => { document.getElementById(pid).style.display = pid === id ? "" : "none"; }); }
 function showApp() { showPage("appView"); }
 function showLanding() { showPage("landingView"); }
 
@@ -703,6 +703,9 @@ const storedSidebarState = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
 setSidebarCollapsed(storedSidebarState === null ? true : storedSidebarState === "1"); // collapsed by default on first visit
 
 sidebarToggle.addEventListener("click", () => {
+  setSidebarCollapsed(!sidebarNav.classList.contains("collapsed"));
+});
+document.getElementById("sidebarPin").addEventListener("click", () => {
   setSidebarCollapsed(!sidebarNav.classList.contains("collapsed"));
 });
 sidebarNav.addEventListener("mouseenter", () => {

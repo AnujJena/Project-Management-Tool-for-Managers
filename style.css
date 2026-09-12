@@ -510,7 +510,23 @@ a { color: var(--accent); text-decoration: none; }
   color: var(--text-faint);
   white-space: nowrap;
   overflow: hidden;
+  flex: 1;
 }
+.sidebar-pin {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  color: var(--text-faint);
+  width: 26px; height: 26px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.sidebar-pin svg { width: 15px; height: 15px; }
+.sidebar-pin:hover { color: var(--text); border-color: var(--accent); }
+.sidebar-nav:not(.collapsed) .sidebar-pin,
+.sidebar-nav.hover-peek .sidebar-pin { color: var(--accent); border-color: var(--accent-dark); background: var(--accent-dim); }
+.sidebar-nav.collapsed:not(.hover-peek) .sidebar-pin { display: none; }
 .sidebar-nav.collapsed:not(.hover-peek) .sidebar-brand-label { display: none; }
 .sidebar-nav-list {
   flex: 1;
