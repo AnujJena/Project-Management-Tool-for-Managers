@@ -689,6 +689,29 @@ function switchView(name) {
   if (name === "floorplan") renderFloorPlan();
 }
 
+// ===== Sidebar collapse/expand (persisted, collapsed by default, hover-to-peek when collapsed) =====
+const SIDEBAR_COLLAPSED_KEY = "trackline_sidebar_collapsed";
+const sidebarNav = document.getElementById("sidebarNav");
+const sidebarToggle = document.getElementById("sidebarToggle");
+
+function setSidebarCollapsed(collapsed) {
+  localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? "1" : "0");
+  sidebarNav.classList.toggle("collapsed", collapsed);
+  sidebarNav.classList.remove("hover-peek");
+}
+const storedSidebarState = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+setSidebarCollapsed(storedSidebarState === null ? true : storedSidebarState === "1"); // collapsed by default on first visit
+
+sidebarToggle.addEventListener("click", () => {
+  setSidebarCollapsed(!sidebarNav.classList.contains("collapsed"));
+});
+sidebarNav.addEventListener("mouseenter", () => {
+  if (sidebarNav.classList.contains("collapsed")) sidebarNav.classList.add("hover-peek");
+});
+sidebarNav.addEventListener("mouseleave", () => {
+  sidebarNav.classList.remove("hover-peek");
+});
+
 // ===== Sample loaders =====
 document.querySelectorAll("[data-sample]").forEach((btn) => { btn.addEventListener("click", () => loadSample(btn.dataset.sample)); });
 function loadSample(kind) {
