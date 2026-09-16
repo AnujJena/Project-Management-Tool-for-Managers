@@ -115,11 +115,21 @@ Inventory:
 {"action":"inventory","data":{"items":[{"id":"iv1","name":"2x4 Studs","category":"Lumber","quantity":340,"unit":"pieces","reorderLevel":100,"location":"Yard A"}]}}
 \`\`\`
 
-Floor Plan (a labeled room-layout diagram, NOT a real photorealistic or CAD-precise image — you cannot generate actual images):
+Research Findings (Marketing Research projects only):
+\`\`\`json
+{"action":"findings","data":{"items":[{"id":"fnd1","finding":"Price sensitivity is highest among first-time buyers","theme":"Pricing","evidence":"68% of Q3 respondents cited price as the top barrier","implication":"Consider a lower-priced entry tier"}]}}
+\`\`\`
+
+Billable Hours (Consulting projects only):
+\`\`\`json
+{"action":"billing","data":{"entries":[{"id":"bh1","date":"2026-09-16","consultant":"J. Alvarez","workstream":"Market sizing","hours":6,"billable":true,"rate":150}]}}
+\`\`\`
+
+Floor Plan / Research Design Map / Engagement Map (a labeled box diagram, NOT a real photorealistic or CAD-precise image — you cannot generate actual images. For a Marketing Research project the "rooms" are actually study PHASES (e.g. Screener, Recruitment, Fieldwork, Analysis, Reporting); for a Consulting project they are engagement WORKSTREAMS (e.g. Diagnose, Design, Pilot, Rollout). For a construction project they are literal rooms):
 \`\`\`json
 {"action":"floorplan","data":{"name":"...","widthFt":40,"heightFt":25,"rooms":[{"name":"Living Room","x":4,"y":4,"width":40,"height":45},{"name":"Kitchen","x":48,"y":4,"width":48,"height":30}]}}
 \`\`\`
-(widthFt/heightFt describe the REAL-WORLD size of the whole plan in feet — pick sensible overall dimensions for the described building/unit (a typical single-family home might be 40-60 ft wide; a small apartment might be 25-35 ft). If the user doesn't specify, use reasonable real-world defaults for the described space rather than an arbitrary number. The canvas itself is a 0-100 by 0-100 percentage grid: x,y = top-left corner of the room as a percentage of that grid; width,height = the room's size as a percentage of that grid — the app converts these percentages into feet using widthFt/heightFt automatically to label each room. Lay rooms out so they don't overlap and roughly reflect the described layout — e.g. a kitchen/living area adjoining, bedrooms grouped together, bathrooms near bedrooms — and size each room proportionally to a realistic room of that type (e.g. a primary bedroom bigger than a closet) rather than making every room the same size. The user can also drag rooms directly on the page afterward to reposition or resize them without needing to ask you again. When a person asks you to "draw," "generate," or "create an image of" a floor plan, be upfront that you can produce a simple labeled room-box diagram, not a real image, then produce this json block.)
+(the "rooms" array and its "name"/x/y/width/height fields are used for phases and workstreams too, just with phase/workstream names instead of room names — keep the JSON field names exactly as shown regardless of industry. widthFt/heightFt only matter for construction (real-world size of the plan in feet — pick sensible dimensions, e.g. 40-60 ft for a typical house, 25-35 ft for a small apartment); for Marketing Research/Consulting projects these can be omitted or left at defaults since no physical dimension is shown to the user. The canvas itself is always a 0-100 by 0-100 percentage grid: x,y = top-left corner as a percentage; width,height = size as a percentage. Lay boxes out left-to-right or in a logical flow so they don't overlap and roughly reflect the described sequence or layout, sized proportionally to their relative scope (e.g. a primary bedroom bigger than a closet; a longer fieldwork phase wider than a short screener phase). The user can also drag boxes directly on the page afterward to reposition or resize them without needing to ask you again. When a person asks you to "draw," "generate," or "create an image of" this, be upfront that you can produce a simple labeled box diagram, not a real image, then produce this json block.)
 
 Rules for structured responses:
 - Emit ONE json block per module you are creating or changing. If the user asks you to set up, populate, or update several parts of the project at once (e.g. "set up this whole project" or "update the schedule, budget, and team together"), include multiple json blocks in the same reply — one per module — each using its own shape from above. Only include a json block for a module the user actually wants changed.
@@ -132,7 +142,30 @@ Rules for structured responses:
 
 function buildSystemPrompt(charts, projectType) {
   let prompt = BASE_SYSTEM_PROMPT;
-  if (projectType) prompt += `\n\nThis project's type is: ${projectType}. Tailor advice and examples to a project of this type where relevant.`;
+  if (projectType) {
+    prompt += `\n\nThis project's type is: ${projectType}. Tailor advice and examples to a project of this type where relevant.`;
+    if (projectType === "Marketing Research") {
+      prompt += `\n\nThis is a MARKETING RESEARCH project, not construction — several modules are relabeled in the app's UI for this industry, though their underlying JSON field names below are unchanged:
+- "submittals" action → shown to the user as "Deliverables & Reviews". Use it for research deliverables needing client review: discussion guides, survey instruments, report drafts, toplines, full reports. Set "type" to one of those, "ballInCourt" to who it's pending with (e.g. "Client", "Research Team").
+- "punchlist" action → shown as "Action Items". Use "location" for a category (e.g. "Fieldwork", "Analysis", "Reporting", "Recruitment", "Client") and "trade" for an area/topic, not a physical location or construction trade.
+- "materials"/"attendance"/"machinery" actions → shown as "Recruitment & Incentives" / "Field Team Attendance" / "Field Equipment". Use materials for respondent incentives and recruitment quotas, machinery for field equipment (recorders, tablets, etc.), not construction materials or heavy machinery.
+- "inventory" action → shown as "Incentives & Materials".
+- "floorplan" action → shown as "Research Design Map"; its "rooms" are actually study PHASES (Screener, Recruitment, Fieldwork, Analysis, Reporting, etc.), not physical rooms.
+- "findings" action is available for this industry — use it for research insights as they emerge.
+- Never use construction terminology (RFIs, submittals in the architectural sense, subcontractors, job sites) unless the user explicitly brings it up.`;
+    } else if (projectType === "Consulting") {
+      prompt += `\n\nThis is a CONSULTING project, not construction — several modules are relabeled in the app's UI for this industry, though their underlying JSON field names below are unchanged:
+- "submittals" action → shown to the user as "Deliverables & Sign-offs". Use it for client deliverables needing sign-off: proposals, interim reports, final decks, recommendation memos. Set "type" to one of those, "ballInCourt" to who it's pending with (e.g. "Client", "Engagement Team").
+- "punchlist" action → shown as "Action Items". Use "location" for a workstream name and "trade" for an area/topic, not a physical location or construction trade.
+- "materials"/"attendance"/"machinery" actions → shown as "Resources & Licenses" / "Team Attendance" / "Tools & Software". Use materials for reusable resources/templates/licenses, machinery for software tools in use, not construction materials or heavy machinery.
+- "inventory" action → shown as "Resource Library".
+- "floorplan" action → shown as "Engagement Map"; its "rooms" are actually engagement WORKSTREAMS (e.g. Diagnose, Design, Pilot, Rollout), not physical rooms.
+- "billing" action is available for this industry — use it to log consultant hours against the engagement, split billable vs. non-billable.
+- Never use construction terminology (RFIs, submittals in the architectural sense, subcontractors, job sites) unless the user explicitly brings it up.`;
+    } else {
+      prompt += `\n\nThis is a CONSTRUCTION project (${projectType}). The "findings" and "billing" actions do not apply here — do not use them.`;
+    }
+  }
   if (!charts) return prompt;
   const section = (label, value) => `${label}: ${value ? JSON.stringify(value) : "none yet"}`;
   const stateBlock = [
@@ -155,6 +188,8 @@ function buildSystemPrompt(charts, projectType) {
     section("WBS", charts.wbs),
     section("INVENTORY", charts.inventory),
     section("FLOOR PLAN", charts.floorplan),
+    section("RESEARCH FINDINGS", charts.findings),
+    section("BILLABLE HOURS", charts.billing),
   ].join("\n");
   return prompt + stateBlock;
 }
