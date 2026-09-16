@@ -47,6 +47,20 @@ a { color: var(--accent); text-decoration: none; }
   background: repeating-linear-gradient(45deg, var(--accent) 0 12px, #1a1a1a 12px 24px);
 }
 
+/* ================= Neutral theme (Marketing Research / Consulting projects) ================= */
+body[data-theme="neutral"] {
+  --accent: #4A8FC7;
+  --accent-dark: #326E9E;
+  --accent-dim: rgba(74,143,199,0.14);
+  --accent-2: #6E7FBF;
+  --accent-2-dim: rgba(110,127,191,0.16);
+}
+body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
+
+/* Industry-specific sidebar tabs: hidden by default, shown via JS for the matching industry */
+.sidebar-nav-list .tab.industry-tab { display: none; }
+.sidebar-nav-list .tab.industry-tab.industry-visible { display: flex; }
+
 /* ================= Login gate ================= */
 #loginView { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
 .login-box {

@@ -1,6 +1,13 @@
-# Trackline — AI Construction Project Console
+# Trackline — AI Project Console (Construction, Marketing Research & Consulting)
 
-A project console built specifically for construction project management. Everything below is fully unlocked — there's no paid tier or locked feature, since this is your own free, self-hosted build.
+A project console built for construction, marketing research, and consulting projects. Everything below is fully unlocked — there's no paid tier or locked feature, since this is your own free, self-hosted build.
+
+**Industries:** when you create a project, you pick a type — Residential, Commercial, or Infrastructure (all Construction), or Marketing Research, or Consulting. That choice drives three things automatically:
+1. **Terminology** — five modules relabel themselves for the industry: Submittals/RFI → "Deliverables & Reviews" (Marketing Research) / "Deliverables & Sign-offs" (Consulting); Punch List → "Action Items"; Site Ops → "Fieldwork Ops" / "Engagement Ops"; Floor Plan → "Research Design Map" / "Engagement Map" (its "rooms" become study phases or engagement workstreams); Inventory → "Incentives & Materials" / "Resource Library". Field labels inside each (e.g. "Ball-in-Court" → "Pending With") adapt too.
+2. **Extra modules** — Marketing Research projects get a **Research Findings** tab (insights logged with theme, evidence, and implication); Consulting projects get a **Billable Hours** tab (hours logged per consultant/workstream, split billable vs. non-billable, with computed utilization % and $ billed). These only appear for their matching industry.
+3. **Visual theme** — Construction keeps the industrial hazard-stripe look; Marketing Research and Consulting switch to a neutral professional blue theme (no hazard stripes) across the whole app, including modals and the floating chat.
+
+The AI assistant is briefed on all of this — ask it to draft a submittal on a Consulting project and it'll write a client deliverable, not an RFI.
 
 **Access:** the app sits behind a simple login screen (username `admin`, password `admin`). This is a demo-only gate, not real security — the credentials are visible in the front-end source and there's no server-side check, so anyone with the URL can bypass it via browser dev tools. Use it only to keep casual visitors out, not to protect sensitive data. After logging in, you land directly on the **Dashboard** of your most recent project — the marketing/landing page (with the feature cards, Portfolio link, and "Add New Project") is still there, reachable via the ⚙ Trackline logo in the top-left.
 

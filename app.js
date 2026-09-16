@@ -14,6 +14,7 @@ let state = {
   team: null, timesheets: null, budget: null,
   materials: null, attendance: null, machinery: null,
   charter: null, crashing: null, wbs: null, inventory: null, floorplan: null,
+  findings: null, billing: null,
 };
 let history = [];
 let chatLogData = [];
@@ -56,6 +57,83 @@ document.getElementById("navLogout").addEventListener("click", (e) => {
 });
 
 // ===== Sample data (construction-flavored) =====
+// ===== Industry support (Construction / Marketing Research / Consulting) =====
+function industryFromType(type) {
+  if (type === "Marketing Research") return "marketing_research";
+  if (type === "Consulting") return "consulting";
+  return "construction"; // Residential, Commercial, Infrastructure, or unset
+}
+function currentIndustry() {
+  const projects = loadAllProjects();
+  const p = projects[activeProjectId];
+  return industryFromType(p && p.type);
+}
+const INDUSTRY_LABELS = {
+  construction: {
+    submittals: { tabLabel: "Submittals/RFI", h1: "Submittals & RFIs", sub: "Ask the assistant, or log a submittal or RFI manually. Click a status dot to update it inline.", numberLabel: "Number", typeLabel: "Type", typeOptions: ["RFI", "Submittal"], ballLabel: "Ball-in-Court", addTitle: "Add Submittal / RFI" },
+    punchlist: { tabLabel: "Punch List", h1: "Punch List", sub: "Ask the assistant, or add a punch list item manually. Click a status dot to update it inline.", locationLabel: "Location", tradeLabel: "Trade", addTitle: "Add Punch List Item" },
+    siteops: { tabLabel: "Site Ops", h1: "Site Ops", sub: "Materials, attendance, and machinery — add manually, ask the assistant, or import a spreadsheet.", materialsLabel: "Materials", materialsAdd: "Add Material", attendanceLabel: "Attendance", machineryLabel: "Machinery", machineryAdd: "Add Machine" },
+    floorplan: { tabLabel: "Floor Plan", h1: "Floor Plan", unitNoun: "Room", unitNounPlural: "Rooms" },
+    inventory: { tabLabel: "Inventory", h1: "Inventory", sub: "Ask the assistant, or add stock items manually. Low-stock items are flagged." },
+  },
+  marketing_research: {
+    submittals: { tabLabel: "Deliverables & Reviews", h1: "Deliverables & Reviews", sub: "Ask the assistant, or log a deliverable manually. Click a status dot to update it inline.", numberLabel: "Ref #", typeLabel: "Type", typeOptions: ["Discussion Guide", "Survey Instrument", "Report Draft", "Topline", "Full Report"], ballLabel: "Pending With", addTitle: "Add Deliverable" },
+    punchlist: { tabLabel: "Action Items", h1: "Action Items", sub: "Ask the assistant, or add an action item manually. Click a status dot to update it inline.", locationLabel: "Category", tradeLabel: "Area", addTitle: "Add Action Item" },
+    siteops: { tabLabel: "Fieldwork Ops", h1: "Fieldwork Ops", sub: "Recruitment, field attendance, and equipment — add manually, ask the assistant, or import a spreadsheet.", materialsLabel: "Recruitment & Incentives", materialsAdd: "Add Incentive/Item", attendanceLabel: "Field Team Attendance", machineryLabel: "Field Equipment", machineryAdd: "Add Equipment" },
+    floorplan: { tabLabel: "Research Design Map", h1: "Research Design Map", unitNoun: "Phase", unitNounPlural: "Phases" },
+    inventory: { tabLabel: "Incentives & Materials", h1: "Incentives & Materials", sub: "Ask the assistant, or add stock items manually. Low-stock items are flagged." },
+  },
+  consulting: {
+    submittals: { tabLabel: "Deliverables & Sign-offs", h1: "Deliverables & Sign-offs", sub: "Ask the assistant, or log a deliverable manually. Click a status dot to update it inline.", numberLabel: "Ref #", typeLabel: "Type", typeOptions: ["Proposal", "Interim Report", "Final Deck", "Recommendation Memo"], ballLabel: "Pending With", addTitle: "Add Deliverable" },
+    punchlist: { tabLabel: "Action Items", h1: "Action Items", sub: "Ask the assistant, or add an action item manually. Click a status dot to update it inline.", locationLabel: "Workstream", tradeLabel: "Area", addTitle: "Add Action Item" },
+    siteops: { tabLabel: "Engagement Ops", h1: "Engagement Ops", sub: "Resources, team attendance, and tools — add manually, ask the assistant, or import a spreadsheet.", materialsLabel: "Resources & Licenses", materialsAdd: "Add Resource", attendanceLabel: "Team Attendance", machineryLabel: "Tools & Software", machineryAdd: "Add Tool" },
+    floorplan: { tabLabel: "Engagement Map", h1: "Engagement Map", unitNoun: "Workstream", unitNounPlural: "Workstreams" },
+    inventory: { tabLabel: "Resource Library", h1: "Resource Library", sub: "Ask the assistant, or add resources manually. Low-stock items are flagged." },
+  },
+};
+function labelsFor(module) { return INDUSTRY_LABELS[currentIndustry()][module]; }
+
+function applyIndustryLabels(industry) {
+  if (industry === "construction") document.body.removeAttribute("data-theme");
+  else document.body.setAttribute("data-theme", "neutral");
+
+  const L = INDUSTRY_LABELS[industry];
+
+  const setTab = (view, text) => { const el = document.querySelector(`.tab[data-view="${view}"] .tab-label`); if (el) el.textContent = text; };
+  setTab("submittals", L.submittals.tabLabel);
+  setTab("punchlist", L.punchlist.tabLabel);
+  setTab("siteops", L.siteops.tabLabel);
+  setTab("floorplan", L.floorplan.tabLabel);
+  setTab("inventory", L.inventory.tabLabel);
+
+  const setText = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+  setText("submittalsH1", L.submittals.h1);
+  setText("submittalsSub", L.submittals.sub);
+  setText("punchlistH1", L.punchlist.h1);
+  setText("punchlistSub", L.punchlist.sub);
+  setText("siteopsH1", L.siteops.h1);
+  setText("siteopsSub", L.siteops.sub);
+  setText("inventoryH1", L.inventory.h1);
+  setText("inventorySub", L.inventory.sub);
+  setText("floorplanH1", L.floorplan.h1);
+  setText("btnAddFloorPlan", `＋ Add ${L.floorplan.tabLabel}`);
+  setText("btnAddMaterial", `＋ ${L.siteops.materialsAdd}`);
+  setText("btnAddMachine", `＋ ${L.siteops.machineryAdd}`);
+
+  document.querySelectorAll(".industry-tab").forEach((tab) => {
+    tab.classList.toggle("industry-visible", tab.dataset.industry === industry);
+  });
+  const findingsView = document.getElementById("view-findings");
+  const billingView = document.getElementById("view-billing");
+  if (findingsView) findingsView.style.display = industry === "marketing_research" ? "" : "none";
+  if (billingView) billingView.style.display = industry === "consulting" ? "" : "none";
+  // If the currently active view is one that just got hidden, fall back to Dashboard
+  const activeView = document.querySelector(".view.active");
+  if (activeView && ((activeView.id === "view-findings" && industry !== "marketing_research") || (activeView.id === "view-billing" && industry !== "consulting"))) {
+    switchView("dashboard");
+  }
+}
+
 const SAMPLES = {
   gantt: [
     { id: 1, name: "Mobilization & permits", start: "2026-08-03", end: "2026-08-09", progress: 100 },
@@ -165,6 +243,20 @@ const SAMPLES = {
       { id: "iv3", name: "Romex 12-2 Wire", category: "Electrical", quantity: 900, unit: "ft", reorderLevel: 500, location: "Trailer" },
     ],
   },
+  findings: {
+    items: [
+      { id: "fnd1", finding: "Price sensitivity is highest among first-time buyers", theme: "Pricing", evidence: "68% of Q3 respondents cited price as the top barrier", implication: "Consider a lower-priced entry tier" },
+      { id: "fnd2", finding: "Word-of-mouth outperforms paid channels for trust", theme: "Channels", evidence: "Referred respondents converted at 2.3x the rate of paid-ad respondents", implication: "Invest in a referral program" },
+      { id: "fnd3", finding: "Mobile checkout drop-off spikes at the payment step", theme: "UX", evidence: "41% of mobile sessions abandoned at payment entry", implication: "Simplify mobile payment flow" },
+    ],
+  },
+  billing: {
+    entries: [
+      { id: "bh1", date: todayISO(), consultant: "J. Alvarez", workstream: "Market sizing", hours: 6, billable: true, rate: 150 },
+      { id: "bh2", date: todayISO(), consultant: "R. Chen", workstream: "Client workshop prep", hours: 3, billable: true, rate: 175 },
+      { id: "bh3", date: todayISO(), consultant: "J. Alvarez", workstream: "Internal team sync", hours: 1, billable: false, rate: 150 },
+    ],
+  },
 };
 
 // ===== Page navigation =====
@@ -223,6 +315,8 @@ function ensureCollection(type) {
   if (type === "wbsitem" && !state.wbs) state.wbs = { phases: [] };
   if (type === "inventory" && !state.inventory) state.inventory = { items: [] };
   if (type === "floorplan" && !state.floorplan) state.floorplan = { plans: [] };
+  if (type === "findings" && !state.findings) state.findings = { items: [] };
+  if (type === "billing" && !state.billing) state.billing = { entries: [] };
 }
 
 const ADD_TITLES = {
@@ -231,8 +325,17 @@ const ADD_TITLES = {
   teammember: "Add Team Member", timesheet: "Log Hours", budget: "Add Budget Line Item",
   material: "Add Material", attendance: "Add Attendance Record", machine: "Add Machine",
   crashing: "Add Task to Crashing Analysis", wbsphase: "Add WBS Phase", wbsitem: "Add Work Package",
-  inventory: "Add Inventory Item",
+  inventory: "Add Inventory Item", findings: "Add Finding", billing: "Log Hours",
 };
+function addTitleFor(type) {
+  const L = INDUSTRY_LABELS[currentIndustry()];
+  if (type === "submittals") return L.submittals.addTitle;
+  if (type === "punchlist") return L.punchlist.addTitle;
+  if (type === "material") return `Add ${L.siteops.materialsAdd.replace(/^Add /, "")}`;
+  if (type === "machine") return `Add ${L.siteops.machineryAdd.replace(/^Add /, "")}`;
+  if (type === "inventory") return `Add ${L.inventory.h1.replace(/s$/, "")} Item`;
+  return ADD_TITLES[type];
+}
 
 const FIELD_BUILDERS = {
   gantt: () => `
@@ -260,20 +363,40 @@ const FIELD_BUILDERS = {
     ${fieldRow("Work performed", `<textarea id="af-workPerformed" rows="3"></textarea>`)}
     ${fieldRow("Delays", `<input type="text" id="af-delays" value="None">`)}
   `,
-  submittals: () => `
-    ${fieldRow("Number", `<input type="text" id="af-number" placeholder="e.g. RFI-015 or SUB-010">`)}
-    ${fieldRow("Type", `<select id="af-type"><option>RFI</option><option>Submittal</option></select>`)}
+  submittals: () => {
+    const L = labelsFor("submittals");
+    return `
+    ${fieldRow(L.numberLabel, `<input type="text" id="af-number" placeholder="e.g. RFI-015 or SUB-010">`)}
+    ${fieldRow(L.typeLabel, `<select id="af-type">${L.typeOptions.map((o) => `<option>${escapeHtml(o)}</option>`).join("")}</select>`)}
     ${fieldRow("Subject", `<textarea id="af-subject" rows="3"></textarea>`)}
-    ${fieldRow("Ball-in-Court", `<input type="text" id="af-ballInCourt" placeholder="e.g. Architect">`)}
+    ${fieldRow(L.ballLabel, `<input type="text" id="af-ballInCourt" placeholder="e.g. Architect">`)}
     ${fieldRow("Due date", `<input type="date" id="af-dueDate">`)}
     ${fieldRow("Status", `<select id="af-status"><option selected>Open</option><option>Answered</option><option>Approved</option><option>Rejected</option><option>Revise &amp; Resubmit</option></select>`)}
-  `,
-  punchlist: () => `
-    ${fieldRow("Location", `<input type="text" id="af-location" placeholder="e.g. Unit 204 — Kitchen">`)}
+  `;
+  },
+  punchlist: () => {
+    const L = labelsFor("punchlist");
+    return `
+    ${fieldRow(L.locationLabel, `<input type="text" id="af-location" placeholder="e.g. Unit 204 — Kitchen">`)}
     ${fieldRow("Description", `<textarea id="af-description" rows="3"></textarea>`)}
-    ${fieldRow("Trade", `<input type="text" id="af-trade" placeholder="e.g. Painting">`)}
+    ${fieldRow(L.tradeLabel, `<input type="text" id="af-trade" placeholder="e.g. Painting">`)}
     ${fieldRow("Assigned to", `<input type="text" id="af-assignedTo" placeholder="e.g. ABC Painting Co.">`)}
     ${fieldRow("Status", `<select id="af-status"><option selected>Open</option><option>In Progress</option><option>Complete</option><option>Verified</option></select>`)}
+  `;
+  },
+  findings: () => `
+    ${fieldRow("Finding", `<textarea id="af-finding" rows="2" placeholder="e.g. Price sensitivity is highest among first-time buyers"></textarea>`)}
+    ${fieldRow("Theme / Category", `<input type="text" id="af-theme" placeholder="e.g. Pricing">`)}
+    ${fieldRow("Supporting evidence", `<textarea id="af-evidence" rows="2" placeholder="e.g. 68% of Q3 respondents cited price as the top barrier"></textarea>`)}
+    ${fieldRow("Implication / recommendation", `<textarea id="af-implication" rows="2"></textarea>`)}
+  `,
+  billing: () => `
+    ${fieldRow("Date", `<input type="date" id="af-date">`)}
+    ${fieldRow("Consultant", `<input type="text" id="af-consultant" placeholder="e.g. J. Alvarez">`)}
+    ${fieldRow("Workstream / task", `<input type="text" id="af-workstream" placeholder="e.g. Market sizing">`)}
+    ${fieldRow("Hours", `<input type="number" id="af-hours" min="0" step="0.25" value="1">`)}
+    ${fieldRow("Billable?", `<select id="af-billable"><option value="yes" selected>Billable</option><option value="no">Non-billable</option></select>`)}
+    ${fieldRow("Rate ($/hr)", `<input type="number" id="af-rate" min="0" value="0">`)}
   `,
   burndown: () => {
     const nextDay = state.burndown.days.length;
@@ -353,7 +476,7 @@ const FIELD_BUILDERS = {
 
 function openAddModal(type) {
   ensureCollection(type);
-  document.getElementById("addItemModalTitle").textContent = ADD_TITLES[type];
+  document.getElementById("addItemModalTitle").textContent = addTitleFor(type);
   document.getElementById("addItemModalFields").innerHTML = FIELD_BUILDERS[type]();
   document.getElementById("addItemModalOverlay").dataset.type = type;
   document.getElementById("addItemModalOverlay").style.display = "flex";
@@ -475,6 +598,23 @@ document.getElementById("addItemSubmit").addEventListener("click", () => {
       reorderLevel: Number(val("reorderLevel")) || 0, location: val("location"),
     });
     renderInventory();
+  } else if (type === "findings") {
+    const finding = val("finding");
+    if (!finding) { alert("Please enter the finding."); return; }
+    state.findings.items.push({
+      id: "fnd" + Date.now(), finding, theme: val("theme"),
+      evidence: val("evidence"), implication: val("implication"),
+    });
+    renderFindings();
+  } else if (type === "billing") {
+    const consultant = val("consultant");
+    if (!consultant) { alert("Please enter the consultant's name."); return; }
+    state.billing.entries.push({
+      id: "bh" + Date.now(), date: val("date") || todayISO(), consultant,
+      workstream: val("workstream"), hours: Number(val("hours")) || 0,
+      billable: val("billable") === "yes", rate: Number(val("rate")) || 0,
+    });
+    renderBilling();
   }
 
   persistActiveProject();
@@ -511,6 +651,8 @@ function deleteItem(type, id) {
   else if (type === "wbsphase") { state.wbs.phases = state.wbs.phases.filter((p) => p.id !== id); renderWbs(); }
   else if (type === "wbsitem") { state.wbs.phases.forEach((p) => { p.items = p.items.filter((i) => i.id !== id); }); renderWbs(); }
   else if (type === "inventory") { state.inventory.items = state.inventory.items.filter((i) => i.id !== id); renderInventory(); }
+  else if (type === "findings") { state.findings.items = state.findings.items.filter((i) => i.id !== id); renderFindings(); }
+  else if (type === "billing") { state.billing.entries = state.billing.entries.filter((i) => i.id !== id); renderBilling(); }
   else if (type === "floorplan") { state.floorplan.plans = state.floorplan.plans.filter((p) => p.id !== id); renderFloorPlan(); }
   else if (type === "floorplanpin") { state.floorplan.plans.forEach((p) => { p.pins = p.pins.filter((pin) => pin.id !== id); }); renderFloorPlan(); }
   else if (type === "floorplanroom") {
@@ -533,6 +675,7 @@ function newProjectState(name, type) {
       gantt: null, burndown: null, kanban: null, raid: null, dailylog: null, submittals: null, punchlist: null,
       team: null, timesheets: null, budget: null, materials: null, attendance: null, machinery: null,
       charter: null, crashing: null, wbs: null, inventory: null, floorplan: null,
+      findings: null, billing: null,
     },
     apiHistory: [], chatLog: [], updatedAt: Date.now(),
   };
@@ -570,8 +713,12 @@ function loadProjectIntoApp(project) {
   state.wbs = project.charts.wbs || null;
   state.inventory = project.charts.inventory || null;
   state.floorplan = project.charts.floorplan || null;
+  state.findings = project.charts.findings || null;
+  state.billing = project.charts.billing || null;
   history = project.apiHistory ? [...project.apiHistory] : [];
   chatLogData = project.chatLog ? [...project.chatLog] : [];
+
+  applyIndustryLabels(industryFromType(project.type));
 
   renderGantt(state.gantt);
   renderBurndown(state.burndown);
@@ -588,6 +735,8 @@ function loadProjectIntoApp(project) {
   renderWbs();
   renderInventory();
   renderFloorPlan();
+  renderFindings();
+  renderBilling();
   renderDashboard();
   renderSiteOpsLive();
   renderCalendar();
@@ -605,6 +754,7 @@ function persistActiveProject() {
     team: state.team, timesheets: state.timesheets, budget: state.budget,
     materials: state.materials, attendance: state.attendance, machinery: state.machinery,
     charter: state.charter, crashing: state.crashing, wbs: state.wbs, inventory: state.inventory, floorplan: state.floorplan,
+    findings: state.findings, billing: state.billing,
   };
   projects[activeProjectId].apiHistory = history;
   projects[activeProjectId].chatLog = chatLogData;
@@ -687,6 +837,8 @@ function switchView(name) {
   if (name === "wbs") renderWbs();
   if (name === "inventory") renderInventory();
   if (name === "floorplan") renderFloorPlan();
+  if (name === "findings") renderFindings();
+  if (name === "billing") renderBilling();
 }
 
 // ===== Sidebar collapse/expand (persisted, collapsed by default, hover-to-peek when collapsed) =====
@@ -754,6 +906,8 @@ function loadSample(kind) {
   if (kind === "crashing") state.crashing = SAMPLES.crashing, renderCrashing();
   if (kind === "wbs") state.wbs = SAMPLES.wbs, renderWbs();
   if (kind === "inventory") state.inventory = SAMPLES.inventory, renderInventory();
+  if (kind === "findings") state.findings = SAMPLES.findings, renderFindings();
+  if (kind === "billing") state.billing = SAMPLES.billing, renderBilling();
   persistActiveProject();
 }
 
@@ -804,6 +958,8 @@ const REFRESH_RENDERERS = {
   crashing: () => renderCrashing(),
   wbs: () => renderWbs(),
   inventory: () => renderInventory(),
+  findings: () => renderFindings(),
+  billing: () => renderBilling(),
   floorplan: () => renderFloorPlan(),
   calendar: () => renderCalendar(),
 };
@@ -1086,8 +1242,9 @@ function renderDailyLog(data) {
 function renderSubmittals(data) {
   state.submittals = data;
   const wrap = document.getElementById("submittalsWrap");
+  const L = labelsFor("submittals");
   if (!data || !data.items || !data.items.length) {
-    wrap.innerHTML = `<div class="empty-state" id="submittalsEmpty"><p>No submittals or RFIs logged yet.</p><button class="btn-ghost" data-sample="submittals">Load a sample log</button></div>`;
+    wrap.innerHTML = `<div class="empty-state" id="submittalsEmpty"><p>No ${L.tabLabel.toLowerCase()} logged yet.</p><button class="btn-ghost" data-sample="submittals">Load a sample log</button></div>`;
     rebindSampleButton(wrap);
     return;
   }
@@ -1096,15 +1253,16 @@ function renderSubmittals(data) {
       <td>${escapeHtml(item.subject)}</td><td>${escapeHtml(item.ballInCourt || "—")}</td><td>${escapeHtml(item.dueDate || "—")}</td>
       <td>${statusRadioGroup("submittals", item.id, ["Open", "Answered", "Approved", "Rejected", "Revise & Resubmit"], item.status)}</td>
       <td class="col-delete"><button class="row-delete-btn" data-del="submittals:${item.id}" title="Delete item">×</button></td></tr>`).join("");
-  wrap.innerHTML = `<table class="log-table"><thead><tr><th>Number</th><th>Subject</th><th>Ball-in-Court</th><th>Due</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+  wrap.innerHTML = `<table class="log-table"><thead><tr><th>${escapeHtml(L.numberLabel)}</th><th>Subject</th><th>${escapeHtml(L.ballLabel)}</th><th>Due</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 // ===== Punch List rendering =====
 function renderPunchlist(data) {
   state.punchlist = data;
   const wrap = document.getElementById("punchlistWrap");
+  const L = labelsFor("punchlist");
   if (!data || !data.items || !data.items.length) {
-    wrap.innerHTML = `<div class="empty-state" id="punchlistEmpty"><p>No punch list yet.</p><button class="btn-ghost" data-sample="punchlist">Load a sample list</button></div>`;
+    wrap.innerHTML = `<div class="empty-state" id="punchlistEmpty"><p>No ${L.tabLabel.toLowerCase()} yet.</p><button class="btn-ghost" data-sample="punchlist">Load a sample list</button></div>`;
     rebindSampleButton(wrap);
     return;
   }
@@ -1112,7 +1270,7 @@ function renderPunchlist(data) {
       <tr><td>${escapeHtml(item.location)}</td><td>${escapeHtml(item.description)}</td><td>${escapeHtml(item.trade || "—")}</td>
       <td>${escapeHtml(item.assignedTo || "—")}</td><td>${statusRadioGroup("punchlist", item.id, ["Open", "In Progress", "Complete", "Verified"], item.status)}</td>
       <td class="col-delete"><button class="row-delete-btn" data-del="punchlist:${item.id}" title="Delete item">×</button></td></tr>`).join("");
-  wrap.innerHTML = `<table class="log-table"><thead><tr><th>Location</th><th>Description</th><th>Trade</th><th>Assigned To</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+  wrap.innerHTML = `<table class="log-table"><thead><tr><th>${escapeHtml(L.locationLabel)}</th><th>Description</th><th>${escapeHtml(L.tradeLabel)}</th><th>Assigned To</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 // ===== Team & Timesheets rendering =====
@@ -1205,6 +1363,7 @@ function renderBudget(data) {
 function renderSiteOps() {
   const wrap = document.getElementById("siteopsWrap");
   if (!wrap) return;
+  const L = labelsFor("siteops");
   const materials = (state.materials && state.materials.items) || [];
   const records = (state.attendance && state.attendance.records) || [];
   const machines = (state.machinery && state.machinery.items) || [];
@@ -1232,15 +1391,15 @@ function renderSiteOps() {
 
   wrap.innerHTML = `
     <div class="team-panel">
-      <h2>Materials</h2>
-      <table class="log-table"><thead><tr><th>Material</th><th>Used / Delivered</th><th>Usage</th><th></th></tr></thead><tbody>${materialRows}</tbody></table>
+      <h2>${escapeHtml(L.materialsLabel)}</h2>
+      <table class="log-table"><thead><tr><th>Item</th><th>Used / Delivered</th><th>Usage</th><th></th></tr></thead><tbody>${materialRows}</tbody></table>
     </div>
     <div class="team-panel">
-      <h2>Attendance</h2>
+      <h2>${escapeHtml(L.attendanceLabel)}</h2>
       <table class="log-table"><thead><tr><th>Date</th><th>Team Member</th><th>Status</th><th></th></tr></thead><tbody>${attendanceRows}</tbody></table>
     </div>
     <div class="team-panel">
-      <h2>Machinery</h2>
+      <h2>${escapeHtml(L.machineryLabel)}</h2>
       <table class="log-table"><thead><tr><th>Name / ID</th><th>Type</th><th>Status</th><th></th></tr></thead><tbody>${machineRows}</tbody></table>
     </div>
   `;
@@ -1478,6 +1637,18 @@ const MODULE_SCHEMAS = {
     },
     afterSet: () => renderCharter(),
   },
+  findings: {
+    sheet: "Findings",
+    sample: [{ Finding: "Price sensitivity is highest among first-time buyers", Theme: "Pricing", Evidence: "68% of Q3 respondents cited price as the top barrier", Implication: "Consider a lower-priced entry tier" }],
+    setRows: (rows) => { state.findings = { items: rows.map((r, i) => ({ id: "fnd" + Date.now() + i, finding: String(r.Finding || ""), theme: String(r.Theme || ""), evidence: String(r.Evidence || ""), implication: String(r.Implication || "") })).filter((x) => x.finding) }; },
+    afterSet: () => renderFindings(),
+  },
+  billing: {
+    sheet: "Billing",
+    sample: [{ Date: todayISO(), Consultant: "J. Alvarez", Workstream: "Market sizing", Hours: 4, Billable: "yes", Rate: 150 }],
+    setRows: (rows) => { state.billing = { entries: rows.map((r, i) => ({ id: "bh" + Date.now() + i, date: String(r.Date || todayISO()), consultant: String(r.Consultant || ""), workstream: String(r.Workstream || ""), hours: Number(r.Hours) || 0, billable: String(r.Billable || "yes").toLowerCase() !== "no", rate: Number(r.Rate) || 0 })).filter((x) => x.consultant) }; },
+    afterSet: () => renderBilling(),
+  },
 };
 
 document.querySelectorAll("[data-xl-template]").forEach((btn) => {
@@ -1614,9 +1785,10 @@ function renderWbs() {
 function renderInventory() {
   const wrap = document.getElementById("inventoryWrap");
   if (!wrap) return;
+  const L = labelsFor("inventory");
   const items = (state.inventory && state.inventory.items) || [];
   if (!items.length) {
-    wrap.innerHTML = `<div class="empty-state" id="inventoryEmpty"><p>No inventory yet.</p><button class="btn-ghost" data-sample="inventory">Load sample inventory</button></div>`;
+    wrap.innerHTML = `<div class="empty-state" id="inventoryEmpty"><p>No ${L.h1.toLowerCase()} yet.</p><button class="btn-ghost" data-sample="inventory">Load sample ${L.h1.toLowerCase()}</button></div>`;
     rebindSampleButton(wrap);
     return;
   }
@@ -1630,13 +1802,61 @@ function renderInventory() {
   wrap.innerHTML = `<table class="log-table"><thead><tr><th>Item</th><th>Category</th><th>On Hand</th><th>Reorder Level</th><th>Location</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
+// ===== Research Findings (Marketing Research) =====
+function renderFindings() {
+  const wrap = document.getElementById("findingsWrap");
+  if (!wrap) return;
+  const items = (state.findings && state.findings.items) || [];
+  if (!items.length) {
+    wrap.innerHTML = `<div class="empty-state" id="findingsEmpty"><p>No findings logged yet.</p><button class="btn-ghost" data-sample="findings">Load sample findings</button></div>`;
+    rebindSampleButton(wrap);
+    return;
+  }
+  const rows = items.map((it) => `<tr>
+      <td>${escapeHtml(it.finding)}</td>
+      <td>${it.theme ? `<span class="log-badge type-${slug(it.theme)}">${escapeHtml(it.theme)}</span>` : "—"}</td>
+      <td>${escapeHtml(it.evidence || "—")}</td>
+      <td>${escapeHtml(it.implication || "—")}</td>
+      <td class="col-delete"><button class="row-delete-btn" data-del="findings:${it.id}" title="Delete finding">×</button></td></tr>`).join("");
+  wrap.innerHTML = `<table class="log-table"><thead><tr><th>Finding</th><th>Theme</th><th>Evidence</th><th>Implication</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+// ===== Billable Hours (Consulting) =====
+function renderBilling() {
+  const wrap = document.getElementById("billingWrap");
+  if (!wrap) return;
+  const entries = (state.billing && state.billing.entries) || [];
+  if (!entries.length) {
+    wrap.innerHTML = `<div class="empty-state" id="billingEmpty"><p>No hours logged yet.</p><button class="btn-ghost" data-sample="billing">Load sample hours</button></div>`;
+    rebindSampleButton(wrap);
+    return;
+  }
+  const sorted = [...entries].sort((a, b) => (a.date < b.date ? 1 : -1));
+  let totalHours = 0, billableHours = 0, totalAmount = 0;
+  const rows = sorted.map((e) => {
+    const amount = e.billable ? e.hours * (e.rate || 0) : 0;
+    totalHours += e.hours; if (e.billable) billableHours += e.hours; totalAmount += amount;
+    return `<tr>
+      <td>${escapeHtml(e.date)}</td><td>${escapeHtml(e.consultant)}</td><td>${escapeHtml(e.workstream || "—")}</td>
+      <td>${e.hours}</td><td>${e.billable ? "Billable" : "Non-billable"}</td>
+      <td>${e.billable ? "$" + amount.toLocaleString("en-US", { maximumFractionDigits: 2 }) : "—"}</td>
+      <td class="col-delete"><button class="row-delete-btn" data-del="billing:${e.id}" title="Delete entry">×</button></td></tr>`;
+  }).join("");
+  const utilization = totalHours > 0 ? Math.round((billableHours / totalHours) * 100) : 0;
+  wrap.innerHTML = `
+    <p class="dash-empty-note" style="margin-bottom:12px;">${totalHours}h logged · ${billableHours}h billable (${utilization}% utilization) · $${totalAmount.toLocaleString("en-US", { maximumFractionDigits: 2 })} billed</p>
+    <table class="log-table"><thead><tr><th>Date</th><th>Consultant</th><th>Workstream</th><th>Hours</th><th>Billable?</th><th>Amount</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
 // ===== Floor Plan (image upload + click-to-pin annotations) =====
 function renderFloorPlan() {
   const wrap = document.getElementById("floorplanWrap");
   if (!wrap) return;
   const plans = (state.floorplan && state.floorplan.plans) || [];
+  const FL = labelsFor("floorplan");
+  const isConstruction = currentIndustry() === "construction";
   if (!plans.length) {
-    wrap.innerHTML = `<div class="empty-state" id="floorplanEmpty"><p>No floor plans yet.</p><button class="btn-ghost" id="floorplanEmptyAdd">＋ Add Floor Plan</button></div>`;
+    wrap.innerHTML = `<div class="empty-state" id="floorplanEmpty"><p>No ${FL.tabLabel.toLowerCase()}s yet.</p><button class="btn-ghost" id="floorplanEmptyAdd">＋ Add ${FL.tabLabel}</button></div>`;
     const btn = document.getElementById("floorplanEmptyAdd");
     if (btn) btn.addEventListener("click", openFloorPlanModal);
     return;
@@ -1648,27 +1868,31 @@ function renderFloorPlan() {
     const canvasHtml = isSchematic
       ? `<div class="floorplan-image-holder floorplan-schematic" data-plan-id="${p.id}">
           ${(p.rooms || []).map((r) => {
-            const rw = ((r.width / 100) * widthFt).toFixed(1);
-            const rh = ((r.height / 100) * heightFt).toFixed(1);
+            const dimHtml = isConstruction ? `<br><span class="floorplan-room-dim">${((r.width / 100) * widthFt).toFixed(1)}' × ${((r.height / 100) * heightFt).toFixed(1)}'</span>` : "";
             return `<div class="floorplan-room" data-room-id="${r.id}" style="left:${r.x}%; top:${r.y}%; width:${r.width}%; height:${r.height}%;">
-              <button class="floorplan-room-delete" data-del="floorplanroom:${p.id}::${r.id}" title="Delete room">×</button>
-              <div class="floorplan-room-label" title="Double-click to rename">${escapeHtml(r.name)}<br><span class="floorplan-room-dim">${rw}' × ${rh}'</span></div>
+              <button class="floorplan-room-delete" data-del="floorplanroom:${p.id}::${r.id}" title="Delete ${FL.unitNoun.toLowerCase()}">×</button>
+              <div class="floorplan-room-label" title="Double-click to rename">${escapeHtml(r.name)}${dimHtml}</div>
               <div class="floorplan-room-handle" title="Drag to resize"></div>
             </div>`;
           }).join("")}
-          ${(p.rooms || []).length === 0 ? `<div class="floorplan-schematic-empty">No rooms yet — click "＋ Add Room" above, or ask the assistant.</div>` : ""}
+          ${(p.rooms || []).length === 0 ? `<div class="floorplan-schematic-empty">No ${FL.unitNounPlural.toLowerCase()} yet — click "＋ Add ${FL.unitNoun}" above, or ask the assistant.</div>` : ""}
           ${pinsHtml}
         </div>`
       : `<div class="floorplan-image-holder" data-plan-id="${p.id}">
           <img src="${p.imageDataUrl}" alt="${escapeHtml(p.name)}" draggable="false">
           ${pinsHtml}
         </div>`;
+    const schematicTag = isSchematic
+      ? (isConstruction
+          ? ` <span class="crash-recommend">AI schematic — ${widthFt}' × ${heightFt}' overall (${(widthFt * heightFt).toLocaleString("en-US")} sq ft) · not to scale</span>`
+          : ` <span class="crash-recommend">AI-drafted — not to scale</span>`)
+      : "";
     return `
     <div class="floorplan-card">
       <div class="floorplan-card-head">
-        <h2>${escapeHtml(p.name)}${isSchematic ? ` <span class="crash-recommend">AI schematic — ${widthFt}' × ${heightFt}' overall (${(widthFt * heightFt).toLocaleString("en-US")} sq ft) · not to scale</span>` : ""}</h2>
+        <h2>${escapeHtml(p.name)}${schematicTag}</h2>
         <div style="display:flex; gap:8px; align-items:center;">
-          ${isSchematic ? `<button class="btn-tiny" data-add-room="${p.id}">＋ Add Room</button>` : ""}
+          ${isSchematic ? `<button class="btn-tiny" data-add-room="${p.id}">＋ Add ${escapeHtml(FL.unitNoun)}</button>` : ""}
           <button class="row-delete-btn" data-del="floorplan:${p.id}" title="Delete floor plan">×</button>
         </div>
       </div>
@@ -1717,7 +1941,7 @@ function attachFloorPlanRoomEvents(plan) {
       e.stopPropagation();
       const room = plan.rooms.find((r) => r.id === roomId);
       if (!room) return;
-      const newName = prompt("Rename room:", room.name);
+      const newName = prompt(`Rename ${labelsFor("floorplan").unitNoun.toLowerCase()}:`, room.name);
       if (!newName) return;
       room.name = newName;
       renderFloorPlan();
@@ -1866,6 +2090,13 @@ document.getElementById("floorPlanSubmit").addEventListener("click", () => {
 let addRoomToPlanId = null;
 function openAddRoomModal(planId) {
   addRoomToPlanId = planId;
+  const FL = labelsFor("floorplan");
+  const isConstruction = currentIndustry() === "construction";
+  document.getElementById("addRoomModalTitle").textContent = `Add ${FL.unitNoun}`;
+  document.getElementById("arNameLabel").textContent = `${FL.unitNoun} name`;
+  document.getElementById("arName").placeholder = isConstruction ? "e.g. Primary Bedroom" : (FL.unitNoun === "Phase" ? "e.g. Fieldwork" : "e.g. Diagnostic");
+  document.getElementById("arDimensionFields").style.display = isConstruction ? "block" : "none";
+  document.getElementById("addRoomNote").textContent = `New ${FL.unitNounPlural.toLowerCase()} are placed in the top-left corner — drag to position and drag the corner handle to resize afterward.`;
   document.getElementById("arName").value = "";
   document.getElementById("arWidthFt").value = "12";
   document.getElementById("arHeightFt").value = "12";
@@ -1875,20 +2106,28 @@ function openAddRoomModal(planId) {
 function closeAddRoomModal() { document.getElementById("addRoomModalOverlay").style.display = "none"; addRoomToPlanId = null; }
 document.getElementById("addRoomCancel").addEventListener("click", closeAddRoomModal);
 document.getElementById("addRoomSubmit").addEventListener("click", () => {
+  const FL = labelsFor("floorplan");
+  const isConstruction = currentIndustry() === "construction";
   const name = document.getElementById("arName").value.trim();
-  if (!name) { alert("Please enter a room name."); return; }
+  if (!name) { alert(`Please enter a ${FL.unitNoun.toLowerCase()} name.`); return; }
   const plan = (state.floorplan && state.floorplan.plans || []).find((p) => p.id === addRoomToPlanId);
   if (!plan) { closeAddRoomModal(); return; }
-  const widthFt = Number(document.getElementById("arWidthFt").value) || 12;
-  const heightFt = Number(document.getElementById("arHeightFt").value) || 12;
-  const planWidthFt = plan.widthFt || 40, planHeightFt = plan.heightFt || 25;
-  const width = Math.max(4, Math.min(96, (widthFt / planWidthFt) * 100));
-  const height = Math.max(4, Math.min(96, (heightFt / planHeightFt) * 100));
+  let width, height, dimNote = "";
+  if (isConstruction) {
+    const widthFt = Number(document.getElementById("arWidthFt").value) || 12;
+    const heightFt = Number(document.getElementById("arHeightFt").value) || 12;
+    const planWidthFt = plan.widthFt || 40, planHeightFt = plan.heightFt || 25;
+    width = Math.max(4, Math.min(96, (widthFt / planWidthFt) * 100));
+    height = Math.max(4, Math.min(96, (heightFt / planHeightFt) * 100));
+    dimNote = ` (${widthFt}' × ${heightFt}')`;
+  } else {
+    width = 24; height = 24;
+  }
   plan.rooms.push({ id: "room" + Date.now(), name, x: 4, y: 4, width, height });
   renderFloorPlan();
   persistActiveProject();
   closeAddRoomModal();
-  triggerPropagationCheck(`Manually added a room "${name}" (${widthFt}' × ${heightFt}') to floor plan "${plan.name}".`);
+  triggerPropagationCheck(`Manually added a ${FL.unitNoun.toLowerCase()} "${name}"${dimNote} to "${plan.name}".`);
 });
 
 // ===== Dashboard rendering (computed, read-only) =====
@@ -2348,7 +2587,7 @@ const CHAT_MOUNTS = [
   { log: "chatLog", form: "chatForm", input: "chatInput", send: "chatSend" },
   { log: "chatLogPage", form: "chatFormPage", input: "chatInputPage", send: "chatSendPage" },
 ];
-const VIEW_LABELS = { gantt: "Schedule", kanban: "Site Tasks", burndown: "Progress", raid: "RAID Log", dailylog: "Daily Log", submittals: "Submittals/RFI", punchlist: "Punch List", team: "Team", budget: "Budget", calendar: "Calendar", dashboard: "Dashboard", siteops: "Site Ops", charter: "Charter", crashing: "Crashing", wbs: "WBS", inventory: "Inventory", floorplan: "Floor Plan" };
+const VIEW_LABELS = { gantt: "Schedule", kanban: "Site Tasks", burndown: "Progress", raid: "RAID Log", dailylog: "Daily Log", submittals: "Submittals/RFI", punchlist: "Punch List", team: "Team", budget: "Budget", calendar: "Calendar", dashboard: "Dashboard", siteops: "Site Ops", charter: "Charter", crashing: "Crashing", wbs: "WBS", inventory: "Inventory", floorplan: "Floor Plan", findings: "Research Findings", billing: "Billable Hours" };
 
 function addMessage(role, text) { chatLogData.push({ kind: role, text }); CHAT_MOUNTS.forEach((m) => renderChatBubble(document.getElementById(m.log), role, text)); }
 function addNote(text, viewTab) { chatLogData.push({ kind: "note", text, viewTab }); CHAT_MOUNTS.forEach((m) => renderChatBubble(document.getElementById(m.log), "note", text, viewTab)); }
@@ -2412,7 +2651,22 @@ function applyOneAction(action) {
     const rooms = (action.data.rooms || []).map((r, i) => ({ id: "room" + Date.now() + i, name: r.name, x: r.x, y: r.y, width: r.width, height: r.height }));
     state.floorplan.plans.push({ id: "fp" + Date.now(), name: action.data.name || "AI Floor Plan", type: "schematic", widthFt, heightFt, rooms, pins: [] });
     renderFloorPlan();
-    addNote(`✓ Schematic floor plan drafted (${rooms.length} rooms, ${widthFt}' × ${heightFt}' overall) — a labeled room-layout diagram, not a photorealistic image`, "floorplan");
+    const flNoun = labelsFor("floorplan").tabLabel;
+    addNote(`✓ ${flNoun} drafted (${rooms.length} ${labelsFor("floorplan").unitNounPlural.toLowerCase()})${currentIndustry() === "construction" ? ` — ${widthFt}' × ${heightFt}' overall` : ""} — a labeled diagram, not a photorealistic image`, "floorplan");
+  }
+  else if (action.action === "findings") {
+    ensureCollection("findings");
+    const items = (action.data.items || []).map((it, i) => ({ id: it.id || "fnd" + Date.now() + i, finding: it.finding, theme: it.theme, evidence: it.evidence, implication: it.implication }));
+    state.findings = { items };
+    renderFindings();
+    addNote(`✓ Research Findings updated (${items.length} finding${items.length === 1 ? "" : "s"})`, "findings");
+  }
+  else if (action.action === "billing") {
+    ensureCollection("billing");
+    const entries = (action.data.entries || []).map((e, i) => ({ id: e.id || "bh" + Date.now() + i, date: e.date || todayISO(), consultant: e.consultant, workstream: e.workstream, hours: Number(e.hours) || 0, billable: e.billable !== false, rate: Number(e.rate) || 0 }));
+    state.billing = { entries };
+    renderBilling();
+    addNote(`✓ Billable Hours updated (${entries.length} entr${entries.length === 1 ? "y" : "ies"})`, "billing");
   }
 }
 function handleAssistantReply(reply) {
@@ -2438,6 +2692,7 @@ const MODULE_LABEL_FOR_TYPE = {
   material: "Site Ops (materials)", attendance: "Site Ops (attendance)", machine: "Site Ops (machinery)",
   crashing: "Crashing", wbsphase: "WBS", wbsitem: "WBS", inventory: "Inventory",
   floorplan: "Floor Plan", floorplanpin: "Floor Plan (pin)", floorplanroom: "Floor Plan (room)",
+  findings: "Research Findings", billing: "Billable Hours",
 };
 function summarizeActionShort(a) {
   const d = a.data || {};
