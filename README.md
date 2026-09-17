@@ -9,7 +9,7 @@ A project console built for construction, marketing research, and consulting pro
 
 The AI assistant is briefed on all of this — ask it to draft a submittal on a Consulting project and it'll write a client deliverable, not an RFI.
 
-**Access:** the app sits behind a simple login screen (username `admin`, password `admin`). This is a demo-only gate, not real security — the credentials are visible in the front-end source and there's no server-side check, so anyone with the URL can bypass it via browser dev tools. Use it only to keep casual visitors out, not to protect sensitive data. After logging in, you land directly on the **Dashboard** of your most recent project — the marketing/landing page (with the feature cards, Portfolio link, and "Add New Project") is still there, reachable via the ⚙ Trackline logo in the top-left.
+**Access:** there's no login — the app opens straight to a **home page** where you pick which kind of project you're working on: Construction, Marketing Research, or Consulting. Each card shows how many projects you have of that type and takes you to a filtered project list; "All Projects" in the header shows everything at once. The ⚙ Trackline logo always takes you back to this home page.
 
 **Navigation:** all 17 modules live in a collapsible left sidebar (not a top tab bar), labeled "TRACKLINE" in its header. Click the ☰ button to pin it open or collapsed; collapsed shows icons only, and hovering over it temporarily pops it open without changing the pinned state — a dedicated pin button (next to the label) appears during that preview so you can lock it open without having to first move your mouse away. It remembers your last choice across visits (via this browser's local storage) and defaults to collapsed the very first time you open the app. If there are more items than fit vertically, the icon list scrolls on its own. The header block above the content (brand, project selector, status ticker) auto-hides when you scroll down within a tab and reappears when you scroll back up, to reclaim vertical space.
 
@@ -87,10 +87,9 @@ You'll get a free URL like `https://trackline-yourname.vercel.app`.
 ## Notes
 
 - The API key only ever lives on the server (`api/chat.js`) — never sent to the browser, so it's safe to deploy publicly.
-- The `admin`/`admin` login is a front-end-only gate. Do not rely on it to protect anything sensitive.
 - Floor plan images are resized to a max width of 1600px and compressed before being stored in localStorage — this keeps things reasonable, but browsers cap localStorage at roughly 5–10MB per site, so avoid uploading many large images.
 - To change the assistant's tone or the construction knowledge it draws on, edit `BASE_SYSTEM_PROMPT` in `api/chat.js`.
 - Free-tier Vercel functions have a 10-second timeout; if you raise `max_tokens` a lot, very long replies could occasionally hit that limit.
 - Costs: Anthropic bills per API call based on tokens used, not Vercel (static hosting + serverless functions are free at this scale).
 - Cross-tab propagation checks add roughly one extra API call per manual edit, so active editing sessions will use more tokens than just chatting. There's no batching/debouncing on this yet — rapid-fire edits each get their own check.
-- All of this still runs on the same architecture as before: static files, one serverless function, and browser localStorage — no database, no real user accounts beyond the demo login. That was an explicit choice to keep this free and simple rather than production-grade in the traditional sense.
+- All of this still runs on the same architecture as before: static files, one serverless function, and browser localStorage — no database, no user accounts, no login. That was an explicit choice to keep this free and simple rather than production-grade in the traditional sense. There's no access control at all now, so don't put anything sensitive in a publicly-shared deployment.

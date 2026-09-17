@@ -11,25 +11,8 @@
 </head>
 <body>
 
-<!-- ===================== LOGIN GATE ===================== -->
-<div id="loginView">
-  <div class="login-box">
-    <div class="brand" style="justify-content:center; margin-bottom:18px;">
-      <span class="brand-mark">⚙</span>
-      <span class="brand-name">TRACKLINE</span>
-    </div>
-    <p class="login-note">Demo login for this deployment only — username/password are fixed in the front-end code and are not secure authentication. Anyone with the URL can view the source and bypass this. Use it only as a lightweight gate, not real access control.</p>
-    <label for="loginUser">Username</label>
-    <input type="text" id="loginUser" placeholder="admin" autocomplete="username">
-    <label for="loginPass">Password</label>
-    <input type="password" id="loginPass" placeholder="admin" autocomplete="current-password">
-    <div id="loginError" class="login-error" style="display:none;">Incorrect username or password.</div>
-    <button class="btn-primary btn-block" id="btnLogin" style="margin-top:16px;">Log In</button>
-  </div>
-</div>
-
-<!-- ===================== LANDING PAGE ===================== -->
-<div id="landingView" style="display:none;">
+<!-- ===================== HOME (industry picker) ===================== -->
+<div id="landingView">
 
   <header class="landing-nav">
     <div class="brand">
@@ -37,128 +20,42 @@
       <span class="brand-name">TRACKLINE</span>
     </div>
     <nav class="landing-links">
-      <a href="#" id="navDashboard">Dashboard</a>
-      <a href="#" id="navPortfolio">Portfolio</a>
-      <a href="#" id="navHelp">Help</a>
-      <a href="#" id="navLogout">Log Out</a>
-      <span class="profile-dot" title="No account needed — everything is saved in this browser only">◑</span>
+      <a href="#" id="navPortfolio">All Projects</a>
+      <a href="#" id="navChatHistory">Chat History</a>
     </nav>
   </header>
   <div class="hazard-strip"></div>
 
-  <div class="help-panel" id="helpPanel">
-    <strong>Quick tips</strong>
-    <ul>
-      <li>"Plan a 12-week ground-up build as a schedule"</li>
-      <li>"Show a schedule burndown for a 60-day project"</li>
-      <li>"Set up a site task board for this week"</li>
-      <li>"Build a RAID log for permit and weather risk"</li>
-      <li>"Log today's site report — clear, 68°F, 14 crew"</li>
-      <li>"Open an RFI about the beam detail on sheet S-201"</li>
-      <li>"Add a punch list item for Unit 204"</li>
-      <li>"Add a budget line for concrete — estimated $45,000"</li>
-      <li>"Sketch a schematic floor plan for a 3-bed, 2-bath single-story home"</li>
-      <li>"Set up this whole project" — the assistant can update several tabs at once</li>
-    </ul>
-  </div>
-
   <section class="hero">
     <h1>Welcome to <span class="hero-accent">Trackline</span></h1>
-    <p class="hero-sub">The AI project console built for construction — schedule the job, log the site, track budget and crew, and get a project manager's advice whenever you need it.</p>
-    <div class="hero-actions">
-      <button class="btn-primary" id="btnAddProject"><span>＋</span> Add New Project</button>
-      <button class="btn-secondary" id="btnViewProjects">View Existing Projects</button>
+    <p class="hero-sub">Pick the kind of project you're running. The workspace, terminology, and tools adapt to match.</p>
+  </section>
+
+  <section class="industry-picker">
+    <div class="industry-card" data-industry="construction" role="button" tabindex="0">
+      <div class="industry-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M3 21h18M5 21V10l7-6 7 6v11M9 21v-6h6v6" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+      <h2>Construction</h2>
+      <p>Schedules, site ops, submittals &amp; RFIs, punch lists, crews, and budgets — for residential, commercial, and infrastructure builds.</p>
+      <span class="industry-card-count" id="countConstruction"></span>
+      <span class="industry-card-cta">View projects →</span>
+    </div>
+    <div class="industry-card" data-industry="marketing_research" role="button" tabindex="0">
+      <div class="industry-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M11 4a7 7 0 104.9 12l4.1 4.1 1.4-1.4-4.1-4.1A7 7 0 0011 4z" stroke="currentColor" stroke-width="1.6"/><path d="M8 11h6M11 8v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
+      <h2>Marketing Research</h2>
+      <p>Deliverables &amp; reviews, fieldwork ops, research design maps, and findings — for consumer and market studies.</p>
+      <span class="industry-card-count" id="countMR"></span>
+      <span class="industry-card-cta">View projects →</span>
+    </div>
+    <div class="industry-card" data-industry="consulting" role="button" tabindex="0">
+      <div class="industry-icon"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v5l3.5 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <h2>Consulting</h2>
+      <p>Deliverables &amp; sign-offs, engagement ops, engagement maps, and billable hours — for client engagements.</p>
+      <span class="industry-card-count" id="countConsulting"></span>
+      <span class="industry-card-cta">View projects →</span>
     </div>
   </section>
 
-  <section class="feature-section">
-    <p class="feature-kicker">EVERYTHING YOU NEED</p>
-    <div class="feature-grid-top">
-      <div class="feature-card" data-browse="gantt" role="button" tabindex="0">
-        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="12" width="4" height="7" rx="1" stroke="currentColor" stroke-width="1.6"/><rect x="10" y="7" width="4" height="12" rx="1" stroke="currentColor" stroke-width="1.6"/><rect x="17" y="3" width="4" height="16" rx="1" stroke="currentColor" stroke-width="1.6"/></svg></div>
-        <h3>Project Schedule</h3>
-        <div class="feature-mini feature-mini-bars"><span style="width:100%"></span><span style="width:65%"></span><span style="width:40%"></span></div>
-      </div>
-      <div class="feature-card" data-browse="kanban" role="button" tabindex="0">
-        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="5" height="16" rx="1" stroke="currentColor" stroke-width="1.6"/><rect x="9.5" y="4" width="5" height="10" rx="1" stroke="currentColor" stroke-width="1.6"/><rect x="16" y="4" width="5" height="13" rx="1" stroke="currentColor" stroke-width="1.6"/></svg></div>
-        <h3>Site Task Board</h3>
-        <div class="feature-mini feature-mini-kanban"><span class="col-label">TO DO</span><span class="col-label">DOING</span><span class="col-label">DONE</span></div>
-      </div>
-      <div class="feature-card" data-browse="burndown" role="button" tabindex="0">
-        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M3 20 L8 13 L12 16 L21 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <h3>Schedule Burndown</h3>
-        <div class="feature-mini feature-mini-burn"></div>
-      </div>
-      <div class="feature-card" data-browse="raid" role="button" tabindex="0">
-        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l8 4v5c0 5-3.4 8-8 9-4.6-1-8-4-8-9V7l8-4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
-        <h3>RAID Log</h3>
-        <div class="feature-mini feature-mini-raid"><span class="raid-dot risk"></span><span class="raid-dot assumption"></span><span class="raid-dot issue"></span><span class="raid-dot dependency"></span></div>
-      </div>
-    </div>
-
-    <p class="feature-kicker">BUILT FOR THE FIELD</p>
-    <div class="feature-grid-secondary">
-      <div class="feature-card" data-browse="dailylog" role="button" tabindex="0">
-        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="17" rx="1.5" stroke="currentColor" stroke-width="1.6"/><path d="M8 2.5v3M16 2.5v3M4 9h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
-        <h3>Daily Log</h3><p class="feature-card-sub">Weather, crew, work performed, delays</p>
-      </div>
-      <div class="feature-card" data-browse="submittals" role="button" tabindex="0">
-        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M6 3h9l4 4v14H6V3z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 12h6M9 16h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
-        <h3>Submittals &amp; RFIs</h3><p class="feature-card-sub">Track ball-in-court and due dates</p>
-      </div>
-      <div class="feature-card" data-browse="punchlist" role="button" tabindex="0">
-        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M5 5h14v14H5z" stroke="currentColor" stroke-width="1.6"/><path d="M8 12l2.5 2.5L16 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <h3>Punch List</h3><p class="feature-card-sub">By location, trade, and status</p>
-      </div>
-    </div>
-
-    <p class="feature-kicker">RUN THE WHOLE JOB</p>
-    <div class="feature-grid-secondary">
-      <div class="feature-card" id="cardTeam" role="button" tabindex="0">
-        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" stroke="currentColor" stroke-width="1.6"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="currentColor" stroke-width="1.6"/><circle cx="17.5" cy="9" r="2.5" stroke="currentColor" stroke-width="1.6"/><path d="M15 20c.2-2.6 2-4.7 4.5-5" stroke="currentColor" stroke-width="1.6"/></svg></div>
-        <h3>Team &amp; Timesheets</h3><p class="feature-card-sub">Crew roster, hours, weekly workload</p>
-      </div>
-      <div class="feature-card" id="cardBudget" role="button" tabindex="0">
-        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v10M9.5 9.5c0-1.4 1.1-2 2.5-2s2.5.7 2.5 2c0 3-5 1.5-5 4.5 0 1.3 1.1 2 2.5 2s2.5-.7 2.5-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>
-        <h3>Budget &amp; Cost</h3><p class="feature-card-sub">Estimated vs. actual, by line item</p>
-      </div>
-      <div class="feature-card" id="cardCalendar" role="button" tabindex="0">
-        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="15" rx="1.5" stroke="currentColor" stroke-width="1.6"/><path d="M4 10h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
-        <h3>Calendar</h3><p class="feature-card-sub">Every date, on one job calendar</p>
-      </div>
-    </div>
-
-    <p class="feature-kicker">PLAN &amp; ANALYZE</p>
-    <div class="feature-grid-secondary">
-      <div class="feature-card" id="cardCharter" role="button" tabindex="0">
-        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M6 3h12v18H6z" stroke="currentColor" stroke-width="1.6"/><path d="M9 8h6M9 12h6M9 16h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
-        <h3>Project Charter</h3><p class="feature-card-sub">Purpose, scope, sponsor, success criteria</p>
-      </div>
-      <div class="feature-card" id="cardWbs" role="button" tabindex="0">
-        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="5" r="2" stroke="currentColor" stroke-width="1.6"/><circle cx="6" cy="19" r="2" stroke="currentColor" stroke-width="1.6"/><circle cx="18" cy="19" r="2" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v6M12 13L6 17M12 13l6 4" stroke="currentColor" stroke-width="1.6"/></svg></div>
-        <h3>WBS</h3><p class="feature-card-sub">Work breakdown, phases &amp; packages</p>
-      </div>
-      <div class="feature-card" id="cardCrashing" role="button" tabindex="0">
-        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M4 20l6-10 4 5 6-10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 5h6v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <h3>Project Crashing</h3><p class="feature-card-sub">Cheapest tasks to compress first</p>
-      </div>
-      <div class="feature-card" id="cardInventory" role="button" tabindex="0">
-        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M3 7l9-4 9 4-9 4-9-4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M3 7v10l9 4 9-4V7M12 11v10" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
-        <h3>Inventory</h3><p class="feature-card-sub">Stock on hand, reorder levels</p>
-      </div>
-    </div>
-
-    <div class="feature-featured" id="cardAiAssistant" role="button" tabindex="0">
-      <div class="feature-icon feature-icon-lg"><svg viewBox="0 0 24 24" fill="none"><path d="M4 5h16v11H8l-4 4V5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
-      <div class="feature-featured-text">
-        <h3>AI Project Manager</h3>
-        <p>Ask about scheduling, RFIs, change orders, safety, budget, or crew coordination — or ask it to set up your whole project at once, updating several tabs from a single request. Every conversation is saved so you can pick up where you left off.</p>
-      </div>
-      <span class="feature-featured-arrow">→</span>
-    </div>
-  </section>
-
-  <footer class="landing-footer"><p>Trackline is a lightweight, free-to-run construction project console — every feature is unlocked, your data stays in this browser.</p></footer>
+  <footer class="landing-footer"><p>Trackline is a lightweight, free-to-run project console — every feature is unlocked, your data stays in this browser.</p></footer>
 </div>
 
 <!-- ===================== BROWSE (per module project picker) ===================== -->
@@ -186,7 +83,7 @@
   <div class="hazard-strip"></div>
   <div class="browse-wrap">
     <div class="browse-head">
-      <div><h1>Portfolio</h1><p class="view-sub">Every project at a glance — schedule, budget, and open items.</p></div>
+      <div><h1 id="portfolioTitle">Portfolio</h1><p class="view-sub" id="portfolioSub">Every project at a glance — schedule, budget, and open items.</p></div>
       <button class="btn-primary" id="portfolioAddNew"><span>＋</span> New Project</button>
     </div>
     <div class="portfolio-grid" id="portfolioGrid"></div>
@@ -275,7 +172,7 @@
       <span class="tab-icon"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v10M9.5 9.5c0-1.4 1.1-2 2.5-2s2.5.7 2.5 2c0 3-5 1.5-5 4.5 0 1.3 1.1 2 2.5 2s2.5-.7 2.5-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>
       <span class="tab-label">Budget</span>
     </button>
-    <button class="tab" data-view="crashing" role="tab" aria-selected="false" title="Crashing">
+    <button class="tab construction-only-tab" data-view="crashing" role="tab" aria-selected="false" title="Crashing">
       <span class="tab-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M4 20l6-10 4 5 6-10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 5h6v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
       <span class="tab-label">Crashing</span>
     </button>

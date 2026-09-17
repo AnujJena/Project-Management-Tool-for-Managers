@@ -1,11 +1,8 @@
 // ===== Constants =====
 const STORAGE_KEY = "trackline_projects_v1";
 const ACTIVE_KEY = "trackline_active_project_v1";
-const AUTH_KEY = "trackline_authed_v1";
-const DEMO_USER = "admin";
-const DEMO_PASS = "admin";
 const MAX_API_HISTORY = 10;
-const PAGES = ["loginView", "landingView", "appView", "browseView", "chatPageView", "portfolioView"];
+const PAGES = ["landingView", "appView", "browseView", "chatPageView", "portfolioView"];
 
 // ===== State =====
 let state = {
@@ -26,35 +23,11 @@ let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 
-// ===== Login gate (demo-only — not real security; see login-note in the UI) =====
-function checkAuthAndBoot() {
-  if (sessionStorage.getItem(AUTH_KEY) === "1") {
-    showApp();
-    switchView("dashboard");
-  } else {
-    showPage("loginView");
-  }
+// ===== Boot straight into the home page (no login gate) =====
+function boot() {
+  showLanding();
+  renderIndustryCounts();
 }
-document.getElementById("btnLogin").addEventListener("click", attemptLogin);
-document.getElementById("loginPass").addEventListener("keydown", (e) => { if (e.key === "Enter") attemptLogin(); });
-function attemptLogin() {
-  const user = document.getElementById("loginUser").value.trim();
-  const pass = document.getElementById("loginPass").value;
-  const err = document.getElementById("loginError");
-  if (user === DEMO_USER && pass === DEMO_PASS) {
-    sessionStorage.setItem(AUTH_KEY, "1");
-    err.style.display = "none";
-    showApp();
-    switchView("dashboard");
-  } else {
-    err.style.display = "block";
-  }
-}
-document.getElementById("navLogout").addEventListener("click", (e) => {
-  e.preventDefault();
-  sessionStorage.removeItem(AUTH_KEY);
-  showPage("loginView");
-});
 
 // ===== Sample data (construction-flavored) =====
 // ===== Industry support (Construction / Marketing Research / Consulting) =====
@@ -75,6 +48,8 @@ const INDUSTRY_LABELS = {
     siteops: { tabLabel: "Site Ops", h1: "Site Ops", sub: "Materials, attendance, and machinery — add manually, ask the assistant, or import a spreadsheet.", materialsLabel: "Materials", materialsAdd: "Add Material", attendanceLabel: "Attendance", machineryLabel: "Machinery", machineryAdd: "Add Machine" },
     floorplan: { tabLabel: "Floor Plan", h1: "Floor Plan", unitNoun: "Room", unitNounPlural: "Rooms" },
     inventory: { tabLabel: "Inventory", h1: "Inventory", sub: "Ask the assistant, or add stock items manually. Low-stock items are flagged." },
+    kanban: { tabLabel: "Site Tasks" },
+    dailylog: { tabLabel: "Daily Log" },
   },
   marketing_research: {
     submittals: { tabLabel: "Deliverables & Reviews", h1: "Deliverables & Reviews", sub: "Ask the assistant, or log a deliverable manually. Click a status dot to update it inline.", numberLabel: "Ref #", typeLabel: "Type", typeOptions: ["Discussion Guide", "Survey Instrument", "Report Draft", "Topline", "Full Report"], ballLabel: "Pending With", addTitle: "Add Deliverable" },
@@ -82,6 +57,8 @@ const INDUSTRY_LABELS = {
     siteops: { tabLabel: "Fieldwork Ops", h1: "Fieldwork Ops", sub: "Recruitment, field attendance, and equipment — add manually, ask the assistant, or import a spreadsheet.", materialsLabel: "Recruitment & Incentives", materialsAdd: "Add Incentive/Item", attendanceLabel: "Field Team Attendance", machineryLabel: "Field Equipment", machineryAdd: "Add Equipment" },
     floorplan: { tabLabel: "Research Design Map", h1: "Research Design Map", unitNoun: "Phase", unitNounPlural: "Phases" },
     inventory: { tabLabel: "Incentives & Materials", h1: "Incentives & Materials", sub: "Ask the assistant, or add stock items manually. Low-stock items are flagged." },
+    kanban: { tabLabel: "Study Tasks" },
+    dailylog: { tabLabel: "Field Notes" },
   },
   consulting: {
     submittals: { tabLabel: "Deliverables & Sign-offs", h1: "Deliverables & Sign-offs", sub: "Ask the assistant, or log a deliverable manually. Click a status dot to update it inline.", numberLabel: "Ref #", typeLabel: "Type", typeOptions: ["Proposal", "Interim Report", "Final Deck", "Recommendation Memo"], ballLabel: "Pending With", addTitle: "Add Deliverable" },
@@ -89,6 +66,8 @@ const INDUSTRY_LABELS = {
     siteops: { tabLabel: "Engagement Ops", h1: "Engagement Ops", sub: "Resources, team attendance, and tools — add manually, ask the assistant, or import a spreadsheet.", materialsLabel: "Resources & Licenses", materialsAdd: "Add Resource", attendanceLabel: "Team Attendance", machineryLabel: "Tools & Software", machineryAdd: "Add Tool" },
     floorplan: { tabLabel: "Engagement Map", h1: "Engagement Map", unitNoun: "Workstream", unitNounPlural: "Workstreams" },
     inventory: { tabLabel: "Resource Library", h1: "Resource Library", sub: "Ask the assistant, or add resources manually. Low-stock items are flagged." },
+    kanban: { tabLabel: "Engagement Tasks" },
+    dailylog: { tabLabel: "Engagement Notes" },
   },
 };
 function labelsFor(module) { return INDUSTRY_LABELS[currentIndustry()][module]; }
@@ -105,6 +84,12 @@ function applyIndustryLabels(industry) {
   setTab("siteops", L.siteops.tabLabel);
   setTab("floorplan", L.floorplan.tabLabel);
   setTab("inventory", L.inventory.tabLabel);
+  setTab("kanban", L.kanban.tabLabel);
+  setTab("dailylog", L.dailylog.tabLabel);
+
+  document.querySelectorAll(".construction-only-tab").forEach((tab) => {
+    tab.classList.toggle("industry-hidden", industry !== "construction");
+  });
 
   const setText = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
   setText("submittalsH1", L.submittals.h1);
@@ -129,7 +114,11 @@ function applyIndustryLabels(industry) {
   if (billingView) billingView.style.display = industry === "consulting" ? "" : "none";
   // If the currently active view is one that just got hidden, fall back to Dashboard
   const activeView = document.querySelector(".view.active");
-  if (activeView && ((activeView.id === "view-findings" && industry !== "marketing_research") || (activeView.id === "view-billing" && industry !== "consulting"))) {
+  if (activeView && (
+    (activeView.id === "view-findings" && industry !== "marketing_research") ||
+    (activeView.id === "view-billing" && industry !== "consulting") ||
+    (activeView.id === "view-crashing" && industry !== "construction")
+  )) {
     switchView("dashboard");
   }
 }
@@ -262,13 +251,13 @@ const SAMPLES = {
 // ===== Page navigation =====
 function showPage(id) { PAGES.forEach((pid) => { document.getElementById(pid).style.display = pid === id ? "" : "none"; }); }
 function showApp() { showPage("appView"); }
-function showLanding() { showPage("landingView"); }
+function showLanding() { document.body.setAttribute("data-theme", "neutral"); showPage("landingView"); }
 
 // ===== New Project modal =====
 let modalCallback = null;
-function promptNewProject(onCreate) {
+function promptNewProject(onCreate, defaultType) {
   document.getElementById("modalProjectName").value = "";
-  document.getElementById("modalProjectType").value = "Residential";
+  document.getElementById("modalProjectType").value = defaultType || "Residential";
   document.getElementById("newProjectModalOverlay").style.display = "flex";
   document.getElementById("modalProjectName").focus();
   modalCallback = onCreate;
@@ -2207,17 +2196,17 @@ function renderDashboard() {
         <div class="stat-sub">Risks, issues &amp; assumptions being tracked</div>
       </div>
       <div class="stat-card${subOpen > 0 ? " warn" : ""}"><span class="stat-icon">${STAT_ICONS.submittals}</span>
-        <div class="stat-label">Open Submittals/RFIs</div>
+        <div class="stat-label">Open ${escapeHtml(labelsFor("submittals").tabLabel)}</div>
         <div class="stat-value">${subOpen}</div>
         <div class="stat-sub">Awaiting response</div>
       </div>
       <div class="stat-card${punchOpen > 0 ? " warn" : ""}"><span class="stat-icon">${STAT_ICONS.punch}</span>
-        <div class="stat-label">Open Punch Items</div>
+        <div class="stat-label">Open ${escapeHtml(labelsFor("punchlist").tabLabel)}</div>
         <div class="stat-value">${punchOpen}</div>
         <div class="stat-sub">Not yet complete or verified</div>
       </div>
       <div class="stat-card"><span class="stat-icon">${STAT_ICONS.siteTasks}</span>
-        <div class="stat-label">Site Tasks</div>
+        <div class="stat-label">${escapeHtml(labelsFor("kanban").tabLabel)}</div>
         <div class="stat-value">${kanbanTotal}</div>
         <div class="stat-sub">${kanbanCols.map((c) => `${c.name}: ${c.cards.length}`).join(" · ") || "No board yet"}</div>
       </div>
@@ -2230,8 +2219,8 @@ function renderDashboard() {
 
     <div class="dashboard-charts-row">
       <div class="live-panel">
-        <div class="stat-label">Site tasks by status</div>
-        ${kanbanTotal ? `<div style="position:relative;height:180px;"><canvas id="taskStatusChart" role="img" aria-label="Site tasks by status"></canvas></div>` : `<p class="dash-empty-note">No site task board yet — add one on the Site Tasks tab.</p>`}
+        <div class="stat-label">${escapeHtml(labelsFor("kanban").tabLabel)} by status</div>
+        ${kanbanTotal ? `<div style="position:relative;height:180px;"><canvas id="taskStatusChart" role="img" aria-label="Tasks by status"></canvas></div>` : `<p class="dash-empty-note">No board yet — add one on the ${escapeHtml(labelsFor("kanban").tabLabel)} tab.</p>`}
       </div>
       <div class="live-panel">
         <div class="stat-label">Budget: estimated vs. actual</div>
@@ -2502,20 +2491,33 @@ document.querySelectorAll('[data-browse]').forEach((card) => {
 document.getElementById("backToLandingFromBrowse").addEventListener("click", (e) => { e.preventDefault(); showLanding(); });
 document.getElementById("brandHomeBrowse").addEventListener("click", () => showLanding());
 
-// ===================== Team / Budget / Calendar / Charter / WBS / Crashing / Inventory landing cards (deep-link into current project) =====================
-document.getElementById("cardTeam").addEventListener("click", () => { showApp(); switchView("team"); });
-document.getElementById("cardBudget").addEventListener("click", () => { showApp(); switchView("budget"); });
-document.getElementById("cardCalendar").addEventListener("click", () => { showApp(); switchView("calendar"); });
-document.getElementById("cardCharter").addEventListener("click", () => { showApp(); switchView("charter"); });
-document.getElementById("cardWbs").addEventListener("click", () => { showApp(); switchView("wbs"); });
-document.getElementById("cardCrashing").addEventListener("click", () => { showApp(); switchView("crashing"); });
-document.getElementById("cardInventory").addEventListener("click", () => { showApp(); switchView("inventory"); });
-[["cardTeam", "team"], ["cardBudget", "budget"], ["cardCalendar", "calendar"], ["cardCharter", "charter"], ["cardWbs", "wbs"], ["cardCrashing", "crashing"], ["cardInventory", "inventory"]].forEach(([id, tab]) => {
-  document.getElementById(id).addEventListener("keydown", (e) => { if (e.key === "Enter") { showApp(); switchView(tab); } });
+// ===================== Home page: industry picker cards =====================
+document.querySelectorAll(".industry-card").forEach((card) => {
+  const go = () => openPortfolio(card.dataset.industry);
+  card.addEventListener("click", go);
+  card.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
 });
+function renderIndustryCounts() {
+  const projects = Object.values(loadAllProjects());
+  const counts = { construction: 0, marketing_research: 0, consulting: 0 };
+  projects.forEach((p) => { counts[industryFromType(p.type)]++; });
+  const setCount = (id, n) => { const el = document.getElementById(id); if (el) el.textContent = n === 0 ? "No projects yet" : `${n} project${n === 1 ? "" : "s"}`; };
+  setCount("countConstruction", counts.construction);
+  setCount("countMR", counts.marketing_research);
+  setCount("countConsulting", counts.consulting);
+}
 
-// ===================== PORTFOLIO (all-projects overview) =====================
-function openPortfolio() { renderPortfolioGrid(); showPage("portfolioView"); }
+// ===================== PORTFOLIO (all-projects overview, optionally filtered by industry) =====================
+let portfolioIndustryFilter = null;
+const INDUSTRY_DISPLAY = { construction: "Construction", marketing_research: "Marketing Research", consulting: "Consulting" };
+const INDUSTRY_DEFAULT_TYPE = { construction: "Residential", marketing_research: "Marketing Research", consulting: "Consulting" };
+function openPortfolio(industry) {
+  portfolioIndustryFilter = industry || null;
+  if (industry === "marketing_research" || industry === "consulting") document.body.setAttribute("data-theme", "neutral");
+  else document.body.removeAttribute("data-theme");
+  renderPortfolioGrid();
+  showPage("portfolioView");
+}
 function projectStats(p) {
   const c = p.charts || {};
   const tasks = c.gantt || [];
@@ -2532,10 +2534,22 @@ function projectStats(p) {
 function renderPortfolioGrid() {
   const projects = loadAllProjects();
   const grid = document.getElementById("portfolioGrid");
-  const entries = Object.entries(projects).sort((a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0));
+  const titleEl = document.getElementById("portfolioTitle");
+  const subEl = document.getElementById("portfolioSub");
+  const defaultType = portfolioIndustryFilter ? INDUSTRY_DEFAULT_TYPE[portfolioIndustryFilter] : "Residential";
+  if (portfolioIndustryFilter) {
+    titleEl.textContent = INDUSTRY_DISPLAY[portfolioIndustryFilter];
+    subEl.textContent = `${INDUSTRY_DISPLAY[portfolioIndustryFilter]} projects — schedule, budget, and open items.`;
+  } else {
+    titleEl.textContent = "Portfolio";
+    subEl.textContent = "Every project at a glance — schedule, budget, and open items.";
+  }
+  let entries = Object.entries(projects).sort((a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0));
+  if (portfolioIndustryFilter) entries = entries.filter(([, p]) => industryFromType(p.type) === portfolioIndustryFilter);
   if (!entries.length) {
-    grid.innerHTML = `<div class="portfolio-empty"><p>No projects yet.</p><button class="btn-primary" id="portfolioEmptyAdd"><span>＋</span> Add New Project</button></div>`;
-    document.getElementById("portfolioEmptyAdd").addEventListener("click", () => { promptNewProject((name, type) => createProjectAndOpen(name, type, "dashboard", true)); });
+    const label = portfolioIndustryFilter ? INDUSTRY_DISPLAY[portfolioIndustryFilter].toLowerCase() : "";
+    grid.innerHTML = `<div class="portfolio-empty"><p>No ${label ? label + " " : ""}projects yet.</p><button class="btn-primary" id="portfolioEmptyAdd"><span>＋</span> Add New Project</button></div>`;
+    document.getElementById("portfolioEmptyAdd").addEventListener("click", () => { promptNewProject((name, type) => createProjectAndOpen(name, type, "dashboard", true), defaultType); });
     return;
   }
   grid.innerHTML = entries.map(([id, p]) => {
@@ -2556,13 +2570,17 @@ function renderPortfolioGrid() {
     card.addEventListener("click", () => { switchActiveProject(card.dataset.projectId); showApp(); switchView("dashboard"); });
   });
 }
-document.getElementById("portfolioAddNew").addEventListener("click", () => { promptNewProject((name, type) => createProjectAndOpen(name, type, "dashboard", true)); });
-document.getElementById("navPortfolio").addEventListener("click", (e) => { e.preventDefault(); openPortfolio(); });
-document.getElementById("backToLandingFromPortfolio").addEventListener("click", (e) => { e.preventDefault(); showLanding(); });
-document.getElementById("brandHomePortfolio").addEventListener("click", () => showLanding());
+document.getElementById("portfolioAddNew").addEventListener("click", () => {
+  const defaultType = portfolioIndustryFilter ? INDUSTRY_DEFAULT_TYPE[portfolioIndustryFilter] : "Residential";
+  promptNewProject((name, type) => createProjectAndOpen(name, type, "dashboard", true), defaultType);
+});
+document.getElementById("navPortfolio").addEventListener("click", (e) => { e.preventDefault(); openPortfolio(null); });
+document.getElementById("backToLandingFromPortfolio").addEventListener("click", (e) => { e.preventDefault(); portfolioIndustryFilter = null; showLanding(); renderIndustryCounts(); });
+document.getElementById("brandHomePortfolio").addEventListener("click", () => { portfolioIndustryFilter = null; showLanding(); renderIndustryCounts(); });
 
 // ===================== DEDICATED CHAT PAGE =====================
 function openChatPage() { renderChatHistoryList(); showPage("chatPageView"); }
+document.getElementById("navChatHistory").addEventListener("click", (e) => { e.preventDefault(); openChatPage(); });
 function renderChatHistoryList() {
   const projects = loadAllProjects();
   const list = document.getElementById("chatHistoryList");
@@ -2579,8 +2597,6 @@ function renderChatHistoryList() {
 document.getElementById("btnNewChat").addEventListener("click", () => { createProjectAndOpen("New chat", "", "dashboard", false); renderChatHistoryList(); });
 document.getElementById("backToLandingFromChat").addEventListener("click", (e) => { e.preventDefault(); showLanding(); });
 document.getElementById("brandHomeChat").addEventListener("click", () => showLanding());
-document.getElementById("cardAiAssistant").addEventListener("click", () => openChatPage());
-document.getElementById("cardAiAssistant").addEventListener("keydown", (e) => { if (e.key === "Enter") openChatPage(); });
 
 // ===================== CHAT (shared logic, two mount points) =====================
 const CHAT_MOUNTS = [
@@ -2863,11 +2879,7 @@ async function setupEntireProject() {
 document.getElementById("btnSetupEntireProject").addEventListener("click", setupEntireProject);
 
 // ===== Landing page misc =====
-document.getElementById("btnAddProject").addEventListener("click", () => { promptNewProject((name, type) => createProjectAndOpen(name, type, "dashboard", true)); });
-document.getElementById("btnViewProjects").addEventListener("click", () => { showApp(); switchView("dashboard"); });
-document.getElementById("navDashboard").addEventListener("click", (e) => { e.preventDefault(); showApp(); switchView("dashboard"); });
-document.getElementById("navHelp").addEventListener("click", (e) => { e.preventDefault(); document.getElementById("helpPanel").classList.toggle("open"); });
-document.getElementById("brandHome").addEventListener("click", () => { persistActiveProject(); showLanding(); });
+document.getElementById("brandHome").addEventListener("click", () => { persistActiveProject(); showLanding(); renderIndustryCounts(); });
 
 // ===== API key status check =====
 (async function checkStatus() {
@@ -2884,4 +2896,4 @@ document.getElementById("brandHome").addEventListener("click", () => { persistAc
 
 // ===== Boot =====
 initProjects();
-checkAuthAndBoot();
+boot();
