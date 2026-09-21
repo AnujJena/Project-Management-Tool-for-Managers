@@ -49,7 +49,8 @@ const INDUSTRY_LABELS = {
     floorplan: { tabLabel: "Floor Plan", h1: "Floor Plan", unitNoun: "Room", unitNounPlural: "Rooms" },
     inventory: { tabLabel: "Inventory", h1: "Inventory", sub: "Ask the assistant, or add stock items manually. Low-stock items are flagged." },
     kanban: { tabLabel: "Site Tasks" },
-    dailylog: { tabLabel: "Daily Log" },
+    dailylog: { tabLabel: "Daily Log", h1: "Daily Log", sub: "Ask the assistant, or log today's site report manually.", entryNoun: "site report", weatherLabel: "Weather", weatherPlaceholder: "e.g. Clear, 75°F", crewLabel: "Crew", crewPlaceholder: "e.g. 10 (Framing crew)", delaysLabel: "Delays" },
+    dashboard: { sub: "A live snapshot of this project — schedule, budget, open items, crew workload, materials, attendance, and machinery.", crewHoursLabel: "Crew Hours (7 days)" },
   },
   marketing_research: {
     submittals: { tabLabel: "Deliverables & Reviews", h1: "Deliverables & Reviews", sub: "Ask the assistant, or log a deliverable manually. Click a status dot to update it inline.", numberLabel: "Ref #", typeLabel: "Type", typeOptions: ["Discussion Guide", "Survey Instrument", "Report Draft", "Topline", "Full Report"], ballLabel: "Pending With", addTitle: "Add Deliverable" },
@@ -58,7 +59,8 @@ const INDUSTRY_LABELS = {
     floorplan: { tabLabel: "Research Design Map", h1: "Research Design Map", unitNoun: "Phase", unitNounPlural: "Phases" },
     inventory: { tabLabel: "Incentives & Materials", h1: "Incentives & Materials", sub: "Ask the assistant, or add stock items manually. Low-stock items are flagged." },
     kanban: { tabLabel: "Study Tasks" },
-    dailylog: { tabLabel: "Field Notes" },
+    dailylog: { tabLabel: "Field Notes", h1: "Field Notes", sub: "Ask the assistant, or log today's fieldwork notes manually.", entryNoun: "field note", weatherLabel: "Field Conditions", weatherPlaceholder: "e.g. High foot traffic, mall entrance B", crewLabel: "Team On", crewPlaceholder: "e.g. 2 interviewers, 1 note-taker", delaysLabel: "Issues / Blockers" },
+    dashboard: { sub: "A live snapshot of this project — schedule, budget, open items, team workload, resources, attendance, and equipment.", crewHoursLabel: "Team Hours (7 days)" },
   },
   consulting: {
     submittals: { tabLabel: "Deliverables & Sign-offs", h1: "Deliverables & Sign-offs", sub: "Ask the assistant, or log a deliverable manually. Click a status dot to update it inline.", numberLabel: "Ref #", typeLabel: "Type", typeOptions: ["Proposal", "Interim Report", "Final Deck", "Recommendation Memo"], ballLabel: "Pending With", addTitle: "Add Deliverable" },
@@ -67,7 +69,8 @@ const INDUSTRY_LABELS = {
     floorplan: { tabLabel: "Engagement Map", h1: "Engagement Map", unitNoun: "Workstream", unitNounPlural: "Workstreams" },
     inventory: { tabLabel: "Resource Library", h1: "Resource Library", sub: "Ask the assistant, or add resources manually. Low-stock items are flagged." },
     kanban: { tabLabel: "Engagement Tasks" },
-    dailylog: { tabLabel: "Engagement Notes" },
+    dailylog: { tabLabel: "Engagement Notes", h1: "Engagement Notes", sub: "Ask the assistant, or log today's engagement notes manually.", entryNoun: "engagement note", weatherLabel: "Location", weatherPlaceholder: "e.g. Onsite at client HQ, remote", crewLabel: "Team On", crewPlaceholder: "e.g. 2 consultants, 1 analyst", delaysLabel: "Issues / Blockers" },
+    dashboard: { sub: "A live snapshot of this project — schedule, budget, open items, team workload, resources, attendance, and tools.", crewHoursLabel: "Team Hours (7 days)" },
   },
 };
 function labelsFor(module) { return INDUSTRY_LABELS[currentIndustry()][module]; }
@@ -98,8 +101,12 @@ function applyIndustryLabels(industry) {
   setText("punchlistSub", L.punchlist.sub);
   setText("siteopsH1", L.siteops.h1);
   setText("siteopsSub", L.siteops.sub);
+  setText("siteopsLiveTitle", `${L.siteops.tabLabel} Live View`);
   setText("inventoryH1", L.inventory.h1);
   setText("inventorySub", L.inventory.sub);
+  setText("dailylogH1", L.dailylog.h1);
+  setText("dailylogSub", L.dailylog.sub);
+  setText("dashboardSub", L.dashboard.sub);
   setText("floorplanH1", L.floorplan.h1);
   setText("btnAddFloorPlan", `＋ Add ${L.floorplan.tabLabel}`);
   setText("btnAddMaterial", `＋ ${L.siteops.materialsAdd}`);
@@ -323,6 +330,7 @@ function addTitleFor(type) {
   if (type === "material") return `Add ${L.siteops.materialsAdd.replace(/^Add /, "")}`;
   if (type === "machine") return `Add ${L.siteops.machineryAdd.replace(/^Add /, "")}`;
   if (type === "inventory") return `Add ${L.inventory.h1.replace(/s$/, "")} Item`;
+  if (type === "dailylog") return `Add ${L.dailylog.h1} Entry`;
   return ADD_TITLES[type];
 }
 
@@ -345,13 +353,16 @@ const FIELD_BUILDERS = {
     ${fieldRow("Impact", `<select id="af-impact"><option>Low</option><option selected>Medium</option><option>High</option></select>`)}
     ${fieldRow("Status", `<select id="af-status"><option selected>Open</option><option>Monitoring</option><option>Mitigated</option><option>Closed</option></select>`)}
   `,
-  dailylog: () => `
+  dailylog: () => {
+    const L = labelsFor("dailylog");
+    return `
     ${fieldRow("Date", `<input type="date" id="af-date" value="${todayISO()}">`)}
-    ${fieldRow("Weather", `<input type="text" id="af-weather" placeholder="e.g. Clear, 75°F">`)}
-    ${fieldRow("Crew", `<input type="text" id="af-crew" placeholder="e.g. 10 (Framing crew)">`)}
+    ${fieldRow(L.weatherLabel, `<input type="text" id="af-weather" placeholder="${escapeHtml(L.weatherPlaceholder)}">`)}
+    ${fieldRow(L.crewLabel, `<input type="text" id="af-crew" placeholder="${escapeHtml(L.crewPlaceholder)}">`)}
     ${fieldRow("Work performed", `<textarea id="af-workPerformed" rows="3"></textarea>`)}
-    ${fieldRow("Delays", `<input type="text" id="af-delays" value="None">`)}
-  `,
+    ${fieldRow(L.delaysLabel, `<input type="text" id="af-delays" value="None">`)}
+  `;
+  },
   submittals: () => {
     const L = labelsFor("submittals");
     return `
@@ -1215,8 +1226,9 @@ function renderRaid(data) {
 function renderDailyLog(data) {
   state.dailylog = data;
   const wrap = document.getElementById("dailylogWrap");
+  const L = labelsFor("dailylog");
   if (!data || !data.entries || !data.entries.length) {
-    wrap.innerHTML = `<div class="empty-state" id="dailylogEmpty"><p>No site reports yet.</p><button class="btn-ghost" data-sample="dailylog">Load sample entries</button></div>`;
+    wrap.innerHTML = `<div class="empty-state" id="dailylogEmpty"><p>No ${escapeHtml(L.entryNoun)}s yet.</p><button class="btn-ghost" data-sample="dailylog">Load sample entries</button></div>`;
     rebindSampleButton(wrap);
     return;
   }
@@ -1224,7 +1236,7 @@ function renderDailyLog(data) {
       <tr><td>${escapeHtml(e.date)}</td><td>${escapeHtml(e.weather || "—")}</td><td>${escapeHtml(e.crew || "—")}</td>
       <td>${escapeHtml(e.workPerformed || "—")}</td><td>${escapeHtml(e.delays || "None")}</td>
       <td class="col-delete"><button class="row-delete-btn" data-del="dailylog:${e.id}" title="Delete entry">×</button></td></tr>`).join("");
-  wrap.innerHTML = `<table class="log-table"><thead><tr><th>Date</th><th>Weather</th><th>Crew</th><th>Work Performed</th><th>Delays</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+  wrap.innerHTML = `<table class="log-table"><thead><tr><th>Date</th><th>${escapeHtml(L.weatherLabel)}</th><th>${escapeHtml(L.crewLabel)}</th><th>Work Performed</th><th>${escapeHtml(L.delaysLabel)}</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 // ===== Submittals & RFI rendering =====
@@ -1402,6 +1414,7 @@ function renderSiteOpsLive() {
   const records = (state.attendance && state.attendance.records) || [];
   const machines = (state.machinery && state.machinery.items) || [];
   const members = (state.team && state.team.members) || [];
+  const L = labelsFor("siteops");
 
   const today = todayISO();
   const todayRecords = records.filter((r) => r.date === today);
@@ -1413,7 +1426,7 @@ function renderSiteOpsLive() {
 
   wrap.innerHTML = `
     <div class="live-gauge-card">
-      <div class="stat-label">Workforce today</div>
+      <div class="stat-label">${escapeHtml(L.attendanceLabel)} today</div>
       <svg width="90" height="90" viewBox="0 0 90 90" style="margin:0 auto;display:block;">
         <circle cx="45" cy="45" r="38" fill="none" stroke="#3E3E44" stroke-width="8"/>
         <circle cx="45" cy="45" r="38" fill="none" stroke="#4CAF6D" stroke-width="8" stroke-dasharray="${circumference}" stroke-dashoffset="${dashoffset}" stroke-linecap="round" transform="rotate(-90 45 45)"/>
@@ -1423,17 +1436,17 @@ function renderSiteOpsLive() {
       <div class="gauge-sub">${totalForToday ? (totalForToday - presentToday) + " absent" : "No records for today"}</div>
     </div>
     <div class="live-panel">
-      <div class="stat-label">Material usage</div>
-      ${materials.length ? `<div style="position:relative;height:190px;"><canvas id="materialUsageChart" role="img" aria-label="Material usage by percentage with unit amounts"></canvas></div>` : `<p style="color:var(--text-faint); font-size:13px; margin:0;">No materials added yet — use the Site Ops tab.</p>`}
+      <div class="stat-label">${escapeHtml(L.materialsLabel)}</div>
+      ${materials.length ? `<div style="position:relative;height:190px;"><canvas id="materialUsageChart" role="img" aria-label="${escapeHtml(L.materialsLabel)} by percentage with unit amounts"></canvas></div>` : `<p style="color:var(--text-faint); font-size:13px; margin:0;">Nothing added yet — use the ${escapeHtml(L.tabLabel)} tab.</p>`}
     </div>
     <div class="live-panel">
-      <div class="stat-label">Heavy machinery</div>
+      <div class="stat-label">${escapeHtml(L.machineryLabel)}</div>
       <div>${machines.length ? machines.map((m) => `
         <div class="machinery-status-row">
           <span class="machinery-dot ${slug(m.status)}"></span>
           <span class="m-name">${escapeHtml(m.name)}${m.type ? " · " + escapeHtml(m.type) : ""}</span>
           <span class="m-status">${escapeHtml(m.status)}</span>
-        </div>`).join("") : `<p style="color:var(--text-faint); font-size:13px; margin:0;">No machinery added yet.</p>`}
+        </div>`).join("") : `<p style="color:var(--text-faint); font-size:13px; margin:0;">Nothing added yet.</p>`}
       </div>
     </div>
   `;
@@ -1478,10 +1491,16 @@ document.getElementById("dashAutoRefresh").addEventListener("click", function ()
 
 // ===== Excel template download & upload (SheetJS) =====
 document.getElementById("btnDownloadTemplate").addEventListener("click", () => {
+  const L = labelsFor("siteops");
+  const isConstruction = currentIndustry() === "construction";
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{ Name: "Concrete", Unit: "cu yd", Delivered: 500, Used: 410 }]), "Materials");
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{ Date: todayISO(), "Member Name": "John Smith", Status: "Present" }]), "Attendance");
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{ Name: "EX-102", Type: "Excavator", Status: "In Use" }]), "Machinery");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([
+    isConstruction ? { Name: "Concrete", Unit: "cu yd", Delivered: 500, Used: 410 } : { Name: "Item", Unit: "units", Delivered: 100, Used: 40 }
+  ]), L.materialsLabel);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{ Date: todayISO(), "Member Name": "John Smith", Status: "Present" }]), L.attendanceLabel);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([
+    isConstruction ? { Name: "EX-102", Type: "Excavator", Status: "In Use" } : { Name: "Item", Type: "Type", Status: "Available" }
+  ]), L.machineryLabel);
   XLSX.writeFile(wb, "trackline-site-ops-template.xlsx");
 });
 
@@ -1489,7 +1508,8 @@ document.getElementById("btnUploadSheet").addEventListener("click", () => docume
 document.getElementById("sheetUploadInput").addEventListener("change", (e) => {
   const file = e.target.files[0];
   if (!file) return;
-  if (!confirm("This will replace your current Materials, Attendance, and Machinery data with whatever is in this sheet's matching tabs. Continue?")) {
+  const L = labelsFor("siteops");
+  if (!confirm(`This will replace your current ${L.materialsLabel}, ${L.attendanceLabel}, and ${L.machineryLabel} data with whatever is in this sheet's matching tabs. Continue?`)) {
     e.target.value = "";
     return;
   }
@@ -1498,25 +1518,25 @@ document.getElementById("sheetUploadInput").addEventListener("change", (e) => {
     try {
       const wb = XLSX.read(evt.target.result, { type: "binary" });
       ensureCollection("material"); ensureCollection("attendance"); ensureCollection("machine");
-      if (wb.SheetNames.includes("Materials")) {
-        const rows = XLSX.utils.sheet_to_json(wb.Sheets["Materials"]);
+      if (wb.SheetNames.includes(L.materialsLabel)) {
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[L.materialsLabel]);
         state.materials.items = rows.map((r, i) => ({ id: "mt" + Date.now() + i, name: String(r.Name || ""), unit: String(r.Unit || "units"), delivered: Number(r.Delivered) || 0, used: Number(r.Used) || 0 })).filter((m) => m.name);
       }
-      if (wb.SheetNames.includes("Attendance")) {
-        const rows = XLSX.utils.sheet_to_json(wb.Sheets["Attendance"]);
+      if (wb.SheetNames.includes(L.attendanceLabel)) {
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[L.attendanceLabel]);
         state.attendance.records = rows.map((r, i) => ({ id: "at" + Date.now() + i, date: String(r.Date || todayISO()), memberName: String(r["Member Name"] || ""), status: String(r.Status || "Present") })).filter((a) => a.memberName);
       }
-      if (wb.SheetNames.includes("Machinery")) {
-        const rows = XLSX.utils.sheet_to_json(wb.Sheets["Machinery"]);
+      if (wb.SheetNames.includes(L.machineryLabel)) {
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[L.machineryLabel]);
         state.machinery.items = rows.map((r, i) => ({ id: "mc" + Date.now() + i, name: String(r.Name || ""), type: String(r.Type || ""), status: String(r.Status || "Available") })).filter((m) => m.name);
       }
       renderSiteOps();
       renderSiteOpsLive();
       persistActiveProject();
-      setTicker("SITE OPS DATA IMPORTED FROM SPREADSHEET", true);
-      triggerPropagationCheck("Imported Site Ops data (materials, attendance, and/or machinery) via spreadsheet, replacing what was there.");
+      setTicker(`${L.tabLabel.toUpperCase()} DATA IMPORTED FROM SPREADSHEET`, true);
+      triggerPropagationCheck(`Imported ${L.tabLabel} data (${L.materialsLabel}, ${L.attendanceLabel}, and/or ${L.machineryLabel}) via spreadsheet, replacing what was there.`);
     } catch (err) {
-      alert("Couldn't read that file — make sure it's an .xlsx export with Materials, Attendance, and/or Machinery tabs matching the template.");
+      alert(`Couldn't read that file — make sure it's an .xlsx export with ${L.materialsLabel}, ${L.attendanceLabel}, and/or ${L.machineryLabel} tabs matching the template.`);
     }
     e.target.value = "";
   };
@@ -2211,7 +2231,7 @@ function renderDashboard() {
         <div class="stat-sub">${kanbanCols.map((c) => `${c.name}: ${c.cards.length}`).join(" · ") || "No board yet"}</div>
       </div>
       <div class="stat-card"><span class="stat-icon">${STAT_ICONS.crew}</span>
-        <div class="stat-label">Crew Hours (7 days)</div>
+        <div class="stat-label">${escapeHtml(labelsFor("dashboard").crewHoursLabel)}</div>
         <div class="stat-value">${totalHoursThisWeek}</div>
         <div class="stat-sub">${members.length} team member${members.length === 1 ? "" : "s"}</div>
       </div>
@@ -2234,8 +2254,8 @@ function renderDashboard() {
         ${raidItems.length ? `<div style="position:relative;height:180px;"><canvas id="raidStatusChart" role="img" aria-label="RAID items by status"></canvas></div>` : `<p class="dash-empty-note">No RAID items yet — add one on the RAID Log tab.</p>`}
       </div>
       <div class="live-panel">
-        <div class="stat-label">Attendance trend (last 7 days)</div>
-        ${(state.attendance && state.attendance.records && state.attendance.records.length) ? `<div style="position:relative;height:180px;"><canvas id="attendanceTrendChart" role="img" aria-label="Percent of crew present, last 7 days"></canvas></div>` : `<p class="dash-empty-note">No attendance recorded yet — add some on the Site Ops tab.</p>`}
+        <div class="stat-label">${escapeHtml(labelsFor("siteops").attendanceLabel)} trend (last 7 days)</div>
+        ${(state.attendance && state.attendance.records && state.attendance.records.length) ? `<div style="position:relative;height:180px;"><canvas id="attendanceTrendChart" role="img" aria-label="Percent present, last 7 days"></canvas></div>` : `<p class="dash-empty-note">No attendance recorded yet — add some on the ${escapeHtml(labelsFor("siteops").tabLabel)} tab.</p>`}
       </div>
     </div>
 

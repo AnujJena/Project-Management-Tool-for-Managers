@@ -227,7 +227,7 @@
 
     <div class="view active" id="view-dashboard">
       <div class="view-head">
-        <div><h1>Project Dashboard</h1><p class="view-sub">A live snapshot of this project — schedule, budget, open items, crew workload, materials, attendance, and machinery.</p></div>
+        <div><h1>Project Dashboard</h1><p class="view-sub" id="dashboardSub">A live snapshot of this project — schedule, budget, open items, crew workload, materials, attendance, and machinery.</p></div>
         <div class="view-actions">
           <button class="btn-primary" id="btnSetupEntireProject">🚀 Set Up Entire Project</button>
           <button class="btn-ghost" id="dashAutoRefresh" data-on="0">⟳ Auto-refresh: Off</button>
@@ -238,7 +238,7 @@
       </div>
       <p class="dash-empty-note" id="setupProgressNote" style="display:none; margin-bottom:14px;"></p>
       <div class="dashboard-wrap" id="dashboardWrap"></div>
-      <div class="dashboard-section-title" style="margin-top:22px;">Site Ops Live View</div>
+      <div class="dashboard-section-title" id="siteopsLiveTitle" style="margin-top:22px;">Site Ops Live View</div>
       <div class="siteops-live-wrap" id="siteopsLiveWrap"></div>
     </div>
 
@@ -327,7 +327,7 @@
 
     <div class="view" id="view-dailylog">
       <div class="view-head">
-        <div><h1>Daily Log</h1><p class="view-sub">Ask the assistant, or log today's site report manually.</p></div>
+        <div><h1 id="dailylogH1">Daily Log</h1><p class="view-sub" id="dailylogSub">Ask the assistant, or log today's site report manually.</p></div>
         <div class="view-actions">
           <button class="btn-ghost" data-add-type="dailylog">＋ Add Entry</button>
           <button class="btn-ghost" data-refresh="dailylog">⟳ Refresh</button>
