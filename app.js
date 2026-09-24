@@ -23,6 +23,27 @@ let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 
+// ===== Dark mode toggle (early theme already applied pre-paint by the inline script in <head>) =====
+const THEME_KEY = "trackline_theme_v1";
+function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function applyTheme(theme) {
+  if (theme === "dark") document.documentElement.setAttribute("data-theme", "dark");
+  else document.documentElement.removeAttribute("data-theme");
+  try { localStorage.setItem(THEME_KEY, theme); } catch (e) {}
+}
+function toggleTheme() {
+  const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+  applyTheme(isDark ? "light" : "dark");
+  // Chart.js/inline-SVG bake colors in at render time, so re-render chart-bearing views to pick up the new palette.
+  renderDashboard();
+  renderSiteOpsLive();
+  if (state.burndown) renderBurndown(state.burndown);
+}
+["themeToggleLogin", "themeToggleLanding", "themeToggleApp"].forEach((id) => {
+  const btn = document.getElementById(id);
+  if (btn) btn.addEventListener("click", toggleTheme);
+});
+
 function chatRequestHeaders() {
   const headers = { "Content-Type": "application/json" };
   const token = window.TracklineAuth && window.TracklineAuth.getAccessToken();
@@ -83,9 +104,6 @@ const INDUSTRY_LABELS = {
 function labelsFor(module) { return INDUSTRY_LABELS[currentIndustry()][module]; }
 
 function applyIndustryLabels(industry) {
-  if (industry === "construction") document.body.removeAttribute("data-theme");
-  else document.body.setAttribute("data-theme", "neutral");
-
   const L = INDUSTRY_LABELS[industry];
 
   const setTab = (view, text) => { const el = document.querySelector(`.tab[data-view="${view}"] .tab-label`); if (el) el.textContent = text; };
@@ -280,7 +298,7 @@ const SAMPLES = {
 // ===== Page navigation =====
 function showPage(id) { PAGES.forEach((pid) => { document.getElementById(pid).style.display = pid === id ? "" : "none"; }); }
 function showApp() { showPage("appView"); }
-function showLanding() { document.body.setAttribute("data-theme", "neutral"); showPage("landingView"); }
+function showLanding() { showPage("landingView"); }
 
 // ===== New Project modal =====
 let modalCallback = null;
@@ -1035,7 +1053,7 @@ document.querySelectorAll("[data-export-png]").forEach((btn) => {
     const original = btn.textContent;
     btn.textContent = "Exporting…";
     try {
-      const canvas = await html2canvas(el, { backgroundColor: "#232326", scale: 2 });
+      const canvas = await html2canvas(el, { backgroundColor: "#FFFFFF", scale: 2 });
       downloadCanvas(canvas, btn.dataset.exportName || "chart");
     } catch (e) { alert("Export failed — try the Export PDF option instead."); }
     finally { btn.disabled = false; btn.textContent = original; }
@@ -1257,15 +1275,15 @@ function renderBurndown(data) {
   burndownChartInstance = new Chart(canvas.getContext("2d"), {
     type: "line",
     data: { labels, datasets: [
-      { label: "Planned", data: ideal, borderColor: "#6B6B72", borderDash: [5, 4], pointRadius: 0, tension: 0 },
-      { label: "Actual", data: actual, borderColor: "#F2B705", backgroundColor: "rgba(242,183,5,0.12)", fill: true, pointRadius: 3, tension: 0.25 },
+      { label: "Planned", data: ideal, borderColor: cssVar("--text-faint"), borderDash: [5, 4], pointRadius: 0, tension: 0 },
+      { label: "Actual", data: actual, borderColor: "#0070F2", backgroundColor: "rgba(0,112,242,0.08)", fill: true, pointRadius: 3, tension: 0.25 },
     ]},
     options: {
       responsive: true,
-      plugins: { legend: { labels: { color: "#A6A6AC", font: { family: "IBM Plex Mono", size: 11 } } } },
+      plugins: { legend: { labels: { color: cssVar("--text-dim"), font: { family: "IBM Plex Mono", size: 11 } } } },
       scales: {
-        x: { ticks: { color: "#6B6B72" }, grid: { color: "rgba(255,255,255,0.05)" } },
-        y: { ticks: { color: "#6B6B72" }, grid: { color: "rgba(255,255,255,0.05)" }, title: { display: true, text: "Work remaining", color: "#A6A6AC" } },
+        x: { ticks: { color: cssVar("--text-faint") }, grid: { color: cssVar("--grid-line") } },
+        y: { ticks: { color: cssVar("--text-faint") }, grid: { color: cssVar("--grid-line") }, title: { display: true, text: "Work remaining", color: cssVar("--text-dim") } },
       },
     },
   });
@@ -1566,10 +1584,10 @@ function renderSiteOpsLive() {
     <div class="live-gauge-card">
       <div class="stat-label">${escapeHtml(L.attendanceLabel)} today</div>
       <svg width="90" height="90" viewBox="0 0 90 90" style="margin:0 auto;display:block;">
-        <circle cx="45" cy="45" r="38" fill="none" stroke="#3E3E44" stroke-width="8"/>
-        <circle cx="45" cy="45" r="38" fill="none" stroke="#4CAF6D" stroke-width="8" stroke-dasharray="${circumference}" stroke-dashoffset="${dashoffset}" stroke-linecap="round" transform="rotate(-90 45 45)"/>
-        <text x="45" y="41" text-anchor="middle" fill="#ECECEA" font-family="'Bebas Neue',sans-serif" font-size="20">${attendancePct}%</text>
-        <text x="45" y="57" text-anchor="middle" fill="#6B6B72" font-family="'IBM Plex Mono',monospace" font-size="9">${presentToday}/${totalForToday || 0}</text>
+        <circle cx="45" cy="45" r="38" fill="none" stroke="${cssVar("--border-strong")}" stroke-width="8"/>
+        <circle cx="45" cy="45" r="38" fill="none" stroke="#107E3E" stroke-width="8" stroke-dasharray="${circumference}" stroke-dashoffset="${dashoffset}" stroke-linecap="round" transform="rotate(-90 45 45)"/>
+        <text x="45" y="41" text-anchor="middle" fill="${cssVar("--text")}" font-family="'Oswald',sans-serif" font-size="20">${attendancePct}%</text>
+        <text x="45" y="57" text-anchor="middle" fill="${cssVar("--text-faint")}" font-family="'IBM Plex Mono',monospace" font-size="9">${presentToday}/${totalForToday || 0}</text>
       </svg>
       <div class="gauge-sub">${totalForToday ? (totalForToday - presentToday) + " absent" : "No records for today"}</div>
     </div>
@@ -1597,7 +1615,7 @@ function renderSiteOpsLive() {
     if (materialChartInstance) materialChartInstance.destroy();
     materialChartInstance = new Chart(canvas.getContext("2d"), {
       type: "bar",
-      data: { labels, datasets: [{ data: pcts, backgroundColor: "#F2B705", borderRadius: 2, maxBarThickness: 16 }] },
+      data: { labels, datasets: [{ data: pcts, backgroundColor: "#0070F2", borderRadius: 2, maxBarThickness: 16 }] },
       options: {
         indexAxis: "y", responsive: true, maintainAspectRatio: false,
         plugins: {
@@ -1605,8 +1623,8 @@ function renderSiteOpsLive() {
           tooltip: { callbacks: { label: (ctx) => `${ctx.parsed.x}% used (${unitLabels[ctx.dataIndex]})` } },
         },
         scales: {
-          x: { min: 0, max: 100, ticks: { color: "#6B6B72", font: { size: 10 }, callback: (v) => v + "%" }, grid: { color: "rgba(255,255,255,0.05)" } },
-          y: { ticks: { color: "#ECECEA", font: { size: 11 } }, grid: { display: false } },
+          x: { min: 0, max: 100, ticks: { color: cssVar("--text-faint"), font: { size: 10 }, callback: (v) => v + "%" }, grid: { color: cssVar("--grid-line") } },
+          y: { ticks: { color: cssVar("--text"), font: { size: 11 } }, grid: { display: false } },
         },
       },
     });
@@ -2411,14 +2429,14 @@ let taskStatusChartInstance = null;
 function renderTaskStatusChart(cols) {
   const canvas = document.getElementById("taskStatusChart");
   if (!canvas || !cols.length) return;
-  const palette = ["#F2B705", "#FF6A1A", "#4CAF6D", "#9B7BE0", "#6B6B72"];
+  const palette = ["#0070F2", "#E9730C", "#0C9C9C", "#7C4DFF", "#107E3E"];
   if (taskStatusChartInstance) taskStatusChartInstance.destroy();
   taskStatusChartInstance = new Chart(canvas.getContext("2d"), {
     type: "doughnut",
-    data: { labels: cols.map((c) => c.name), datasets: [{ data: cols.map((c) => c.cards.length), backgroundColor: cols.map((_, i) => palette[i % palette.length]), borderColor: "#232326", borderWidth: 2 }] },
+    data: { labels: cols.map((c) => c.name), datasets: [{ data: cols.map((c) => c.cards.length), backgroundColor: cols.map((_, i) => palette[i % palette.length]), borderColor: "#FFFFFF", borderWidth: 2 }] },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position: "right", labels: { color: "#A6A6AC", font: { size: 11 }, boxWidth: 10, padding: 10 } } },
+      plugins: { legend: { position: "right", labels: { color: cssVar("--text-dim"), font: { size: 11 }, boxWidth: 10, padding: 10 } } },
     },
   });
 }
@@ -2433,8 +2451,8 @@ function renderBudgetCompareChart(items) {
     data: {
       labels: items.map((i) => i.category || i.description),
       datasets: [
-        { label: "Estimated", data: items.map((i) => Number(i.estimated) || 0), backgroundColor: "#55555C", borderRadius: 2, maxBarThickness: 22 },
-        { label: "Actual", data: items.map((i) => Number(i.actual) || 0), backgroundColor: "#F2B705", borderRadius: 2, maxBarThickness: 22 },
+        { label: "Estimated", data: items.map((i) => Number(i.estimated) || 0), backgroundColor: cssVar("--text-faint"), borderRadius: 2, maxBarThickness: 22 },
+        { label: "Actual", data: items.map((i) => Number(i.actual) || 0), backgroundColor: "#0070F2", borderRadius: 2, maxBarThickness: 22 },
       ],
     },
     options: {
@@ -2444,8 +2462,8 @@ function renderBudgetCompareChart(items) {
         tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: $${ctx.parsed.y.toLocaleString("en-US")}` } },
       },
       scales: {
-        x: { ticks: { color: "#A6A6AC", font: { size: 10 } }, grid: { display: false } },
-        y: { ticks: { color: "#6B6B72", font: { size: 10 }, callback: (v) => "$" + (v >= 1000 ? v / 1000 + "k" : v) }, grid: { color: "rgba(255,255,255,0.05)" } },
+        x: { ticks: { color: cssVar("--text-dim"), font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { color: cssVar("--text-faint"), font: { size: 10 }, callback: (v) => "$" + (v >= 1000 ? v / 1000 + "k" : v) }, grid: { color: cssVar("--grid-line") } },
       },
     },
   });
@@ -2456,7 +2474,7 @@ function renderRaidStatusChart(items) {
   const canvas = document.getElementById("raidStatusChart");
   if (!canvas || !items.length) return;
   const statuses = ["Open", "Monitoring", "Mitigated", "Closed"];
-  const colors = { Open: "#E24B4B", Monitoring: "#F2B705", Mitigated: "#4CAF6D", Closed: "#6B6B72" };
+  const colors = { Open: "#BB0000", Monitoring: "#0070F2", Mitigated: "#107E3E", Closed: cssVar("--text-faint") };
   const counts = statuses.map((s) => items.filter((i) => i.status === s).length);
   if (raidStatusChartInstance) raidStatusChartInstance.destroy();
   raidStatusChartInstance = new Chart(canvas.getContext("2d"), {
@@ -2466,8 +2484,8 @@ function renderRaidStatusChart(items) {
       indexAxis: "y", responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
-        x: { beginAtZero: true, ticks: { color: "#6B6B72", font: { size: 10 }, precision: 0 }, grid: { color: "rgba(255,255,255,0.05)" } },
-        y: { ticks: { color: "#ECECEA", font: { size: 11 } }, grid: { display: false } },
+        x: { beginAtZero: true, ticks: { color: cssVar("--text-faint"), font: { size: 10 }, precision: 0 }, grid: { color: cssVar("--grid-line") } },
+        y: { ticks: { color: cssVar("--text"), font: { size: 11 } }, grid: { display: false } },
       },
     },
   });
@@ -2490,13 +2508,13 @@ function renderAttendanceTrendChart(records, members) {
   if (attendanceTrendChartInstance) attendanceTrendChartInstance.destroy();
   attendanceTrendChartInstance = new Chart(canvas.getContext("2d"), {
     type: "line",
-    data: { labels, datasets: [{ data: pcts, borderColor: "#4CAF6D", backgroundColor: "rgba(76,175,109,0.12)", fill: true, tension: 0.25, spanGaps: true, pointRadius: 3, pointBackgroundColor: "#4CAF6D" }] },
+    data: { labels, datasets: [{ data: pcts, borderColor: "#107E3E", backgroundColor: "rgba(76,175,109,0.12)", fill: true, tension: 0.25, spanGaps: true, pointRadius: 3, pointBackgroundColor: "#107E3E" }] },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => ctx.parsed.y === null ? "No data" : ctx.parsed.y + "% present" } } },
       scales: {
-        x: { ticks: { color: "#6B6B72", font: { size: 10 } }, grid: { display: false } },
-        y: { min: 0, max: 100, ticks: { color: "#6B6B72", font: { size: 10 }, callback: (v) => v + "%" }, grid: { color: "rgba(255,255,255,0.05)" } },
+        x: { ticks: { color: cssVar("--text-faint"), font: { size: 10 } }, grid: { display: false } },
+        y: { min: 0, max: 100, ticks: { color: cssVar("--text-faint"), font: { size: 10 }, callback: (v) => v + "%" }, grid: { color: cssVar("--grid-line") } },
       },
     },
   });
@@ -2671,8 +2689,6 @@ const INDUSTRY_DISPLAY = { construction: "Construction", marketing_research: "Ma
 const INDUSTRY_DEFAULT_TYPE = { construction: "Residential", marketing_research: "Marketing Research", consulting: "Consulting" };
 function openPortfolio(industry) {
   portfolioIndustryFilter = industry || null;
-  if (industry === "marketing_research" || industry === "consulting") document.body.setAttribute("data-theme", "neutral");
-  else document.body.removeAttribute("data-theme");
   renderPortfolioGrid();
   showPage("portfolioView");
 }

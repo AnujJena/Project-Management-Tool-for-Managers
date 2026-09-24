@@ -1,29 +1,60 @@
 :root {
-  --bg: #232326;
-  --bg-page: #16161A;
-  --bg-panel: #232326;
-  --bg-panel-2: #2C2C31;
-  --grid-line: rgba(255,255,255,0.045);
-  --border: #3E3E44;
-  --border-strong: #55555C;
-  --accent: #F2B705;
-  --accent-dark: #C99200;
-  --accent-dim: rgba(242,183,5,0.12);
-  --accent-2: #FF6A1A;
-  --accent-2-dim: rgba(255,106,26,0.14);
-  --success: #4CAF6D;
-  --danger: #E24B4B;
-  --text: #ECECEA;
-  --text-dim: #A6A6AC;
-  --text-faint: #6B6B72;
-  --font-display: 'Bebas Neue', sans-serif;
+  --bg: #FFFFFF;
+  --bg-page: #F5F6F7;
+  --bg-panel: #FFFFFF;
+  --bg-panel-2: #F5F6F7;
+  --grid-line: rgba(29,45,62,0.07);
+  --border: #E4E7EA;
+  --border-strong: #C7CDD4;
+  --accent: #0070F2;
+  --accent-dark: #004FC4;
+  --accent-dim: rgba(0,112,242,0.08);
+  --accent-2: #E9730C;
+  --accent-2-dim: rgba(233,115,12,0.10);
+  --accent-purple: #7C4DFF;
+  --accent-purple-dim: rgba(124,77,255,0.09);
+  --accent-teal: #0C9C9C;
+  --accent-teal-dim: rgba(12,156,156,0.09);
+  --success: #107E3E;
+  --danger: #BB0000;
+  --text: #1D2D3E;
+  --text-dim: #5B6B79;
+  --text-faint: #8A97A5;
+  --font-display: 'Oswald', sans-serif;
   --font-label: 'Oswald', sans-serif;
   --font-body: 'Inter', sans-serif;
   --font-mono: 'IBM Plex Mono', monospace;
-  --radius: 4px;
+  --radius: 6px;
+  --shadow-sm: 0 1px 2px rgba(16,24,32,0.08);
+  --shadow-md: 0 8px 24px rgba(16,24,32,0.12);
+  --bevel: none;
+}
+
+/* ================= Dark mode (toggled via the sun/moon button; persisted in localStorage) ================= */
+:root[data-theme="dark"] {
+  --bg: #1B2430;
+  --bg-page: #121821;
+  --bg-panel: #1B2430;
+  --bg-panel-2: #222D3B;
+  --grid-line: rgba(234,240,246,0.07);
+  --border: #2E3B4A;
+  --border-strong: #445367;
+  --accent: #4E9CFF;
+  --accent-dark: #2E7FDE;
+  --accent-dim: rgba(78,156,255,0.14);
+  --accent-2: #F2954A;
+  --accent-2-dim: rgba(242,149,74,0.15);
+  --accent-purple: #A98BFF;
+  --accent-purple-dim: rgba(169,139,255,0.15);
+  --accent-teal: #2DD4CF;
+  --accent-teal-dim: rgba(45,212,207,0.14);
+  --success: #34C77B;
+  --danger: #F2564F;
+  --text: #EAF0F6;
+  --text-dim: #9FB0C0;
+  --text-faint: #67788A;
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
   --shadow-md: 0 10px 28px rgba(0,0,0,0.5);
-  --bevel: inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -2px 0 rgba(0,0,0,0.4);
 }
 
 * { box-sizing: border-box; }
@@ -34,28 +65,35 @@ html, body {
   background: var(--bg-page);
   color: var(--text);
   font-family: var(--font-body);
-  background-image:
-    repeating-linear-gradient(135deg, rgba(255,255,255,0.012) 0 2px, transparent 2px 26px);
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 button, textarea, input, select { font-family: inherit; }
 a { color: var(--accent); text-decoration: none; }
 
-/* ================= Hazard strip ================= */
-.hazard-strip {
-  height: 7px;
-  background: repeating-linear-gradient(45deg, var(--accent) 0 12px, #1a1a1a 12px 24px);
+/* ================= Theme toggle button ================= */
+.theme-toggle {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  color: var(--text-dim);
+  width: 30px; height: 30px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
 }
+.theme-toggle:hover { color: var(--accent); border-color: var(--accent); }
+.theme-toggle svg { width: 16px; height: 16px; }
+.theme-toggle .icon-sun { display: none; }
+.theme-toggle .icon-moon { display: block; }
+:root[data-theme="dark"] .theme-toggle .icon-sun { display: block; }
+:root[data-theme="dark"] .theme-toggle .icon-moon { display: none; }
 
-/* ================= Neutral theme (Marketing Research / Consulting projects) ================= */
-body[data-theme="neutral"] {
-  --accent: #4A8FC7;
-  --accent-dark: #326E9E;
-  --accent-dim: rgba(74,143,199,0.14);
-  --accent-2: #6E7FBF;
-  --accent-2-dim: rgba(110,127,191,0.16);
+/* ================= Header accent strip (unified across all industries) ================= */
+.hazard-strip {
+  height: 3px;
+  background: var(--accent);
 }
-body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
 
 /* Industry-specific sidebar tabs: hidden by default, shown via JS for the matching industry */
 .sidebar-nav-list .tab.industry-tab { display: none; }
@@ -68,14 +106,22 @@ body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
 /* ================= Login gate ================= */
 #loginView { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
 .login-box {
+  position: relative;
   background: var(--bg-panel);
   border: 1px solid var(--border-strong);
-  border-top: 3px solid var(--accent);
+  border-top: none;
   border-radius: var(--radius);
   box-shadow: var(--shadow-md);
   padding: 32px 30px;
   width: 100%;
   max-width: 360px;
+}
+.login-box::before {
+  content: "";
+  position: absolute; top: -1px; left: -1px; right: -1px;
+  height: 4px;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: linear-gradient(90deg, var(--accent), var(--accent-purple), var(--accent-teal));
 }
 .login-note { font-size: 11.5px; color: var(--text-faint); line-height: 1.5; margin: 0 0 18px; padding: 10px 12px; background: var(--bg-panel-2); border: 1px solid var(--border); border-radius: var(--radius); }
 .login-box label { display: block; font-family: var(--font-label); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-faint); margin: 12px 0 6px; }
@@ -102,7 +148,7 @@ body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
   color: var(--accent) !important;
   position: relative;
 }
-.tab-highlight.active { color: #1a1a1a !important; background: var(--accent) !important; }
+.tab-highlight.active { color: #FFFFFF !important; background: var(--accent) !important; }
 .tab-highlight::after {
   content: "★";
   font-size: 8px;
@@ -114,8 +160,8 @@ body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
 /* ================= Shared brand ================= */
 .brand { display: flex; align-items: center; gap: 9px; cursor: default; }
 .brand-mark {
-  color: var(--bg-page);
-  background: var(--accent);
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-purple));
   width: 26px; height: 26px;
   border-radius: 4px;
   display: flex; align-items: center; justify-content: center;
@@ -130,39 +176,11 @@ body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
   text-transform: uppercase;
 }
 
-/* rivet corners on riveted panels */
 .feature-card, .browse-card, .portfolio-card, .gantt-wrap, .burndown-wrap, .kanban-col, .raid-table,
 .dailylog-wrap, .submittals-wrap, .punchlist-wrap, .stat-card, .team-panel, .budget-table, .calendar-wrap,
 .live-gauge-card, .live-panel {
   position: relative;
 }
-.feature-card::before, .feature-card::after,
-.browse-card::before, .browse-card::after,
-.portfolio-card::before, .portfolio-card::after,
-.gantt-wrap::before, .gantt-wrap::after,
-.burndown-wrap::before, .burndown-wrap::after,
-.kanban-col::before, .kanban-col::after,
-.raid-table::before, .raid-table::after,
-.dailylog-wrap::before, .dailylog-wrap::after,
-.submittals-wrap::before, .submittals-wrap::after,
-.punchlist-wrap::before, .punchlist-wrap::after,
-.stat-card::before, .stat-card::after,
-.team-panel::before, .team-panel::after,
-.budget-table::before, .budget-table::after,
-.calendar-wrap::before, .calendar-wrap::after {
-  content: "";
-  position: absolute;
-  top: 7px;
-  width: 5px; height: 5px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #8a8a90, #1c1c1e 75%);
-  box-shadow: 0 0 0 1px rgba(0,0,0,0.5);
-  z-index: 2;
-}
-.feature-card::before, .browse-card::before, .portfolio-card::before, .gantt-wrap::before, .burndown-wrap::before, .kanban-col::before, .raid-table::before,
-.dailylog-wrap::before, .submittals-wrap::before, .punchlist-wrap::before, .stat-card::before, .team-panel::before, .budget-table::before, .calendar-wrap::before { left: 7px; }
-.feature-card::after, .browse-card::after, .portfolio-card::after, .gantt-wrap::after, .burndown-wrap::after, .kanban-col::after, .raid-table::after,
-.dailylog-wrap::after, .submittals-wrap::after, .punchlist-wrap::after, .stat-card::after, .team-panel::after, .budget-table::after, .calendar-wrap::after { right: 7px; }
 
 /* ================= Landing page ================= */
 #landingView { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
@@ -227,7 +245,7 @@ body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
 
 .btn-primary {
   background: var(--accent);
-  color: #1a1a1a;
+  color: #FFFFFF;
   border: 1px solid var(--accent-dark);
   font-family: var(--font-label);
   font-weight: 600;
@@ -240,10 +258,10 @@ body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  box-shadow: var(--bevel), var(--shadow-sm);
+  box-shadow: var(--shadow-sm);
   transition: background 0.15s ease, transform 0.1s ease;
 }
-.btn-primary:hover { background: #FFC93C; }
+.btn-primary:hover { background: var(--accent-dark); }
 .btn-primary:active { transform: translateY(1px); box-shadow: var(--shadow-sm); }
 
 .btn-secondary {
@@ -391,6 +409,12 @@ body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
 }
 .industry-card:hover { box-shadow: var(--shadow-md); border-top-color: var(--accent); transform: translateY(-3px); }
 .industry-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Each industry gets its own accent hue, scoped to just its card via a local
+   custom-property override — everything inside (icon, hover border, CTA
+   link) already reads var(--accent)/var(--accent-dim), so this is the only
+   change needed. The rest of the app stays on the single unified blue. */
+.industry-card[data-industry="marketing_research"] { --accent: var(--accent-purple); --accent-dim: var(--accent-purple-dim); }
+.industry-card[data-industry="consulting"] { --accent: var(--accent-teal); --accent-dim: var(--accent-teal-dim); }
 .industry-icon {
   width: 46px; height: 46px;
   border: 1.5px solid var(--accent);
@@ -644,7 +668,7 @@ body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
   white-space: nowrap;
 }
 .tab:hover { color: var(--text); background: var(--bg-panel-2); }
-.tab.active { color: #1a1a1a; background: var(--accent); box-shadow: var(--bevel); }
+.tab.active { color: #FFFFFF; background: var(--accent); box-shadow: var(--bevel); }
 
 .app-header-group {
   flex-shrink: 0;
@@ -798,7 +822,7 @@ body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
 .ticker {
   border-bottom: 1px solid var(--border);
   padding: 6px 22px;
-  background: #101012;
+  background: var(--bg-panel-2);
 }
 .ticker-text {
   font-family: var(--font-mono);
@@ -1298,7 +1322,7 @@ body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
 /* ---------- Site Ops (materials / attendance / machinery) ---------- */
 .siteops-wrap { display: flex; flex-direction: column; gap: 22px; }
 .unit-tag { font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); }
-#dashAutoRefresh[data-on="1"] { background: var(--accent); color: #1a1a1a; border-color: var(--accent-dark); }
+#dashAutoRefresh[data-on="1"] { background: var(--accent); color: #FFFFFF; border-color: var(--accent-dark); }
 
 .siteops-live-wrap {
   display: grid;
@@ -1331,7 +1355,7 @@ body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
   width: 18px; height: 18px;
   margin-left: -9px; margin-top: -18px;
   background: var(--accent);
-  border: 2px solid #1a1a1a;
+  border: 2px solid #FFFFFF;
   border-radius: 50% 50% 50% 0;
   transform: rotate(-45deg);
   cursor: pointer;
@@ -1467,7 +1491,7 @@ body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
   align-items: center;
   gap: 8px;
   background: var(--accent);
-  color: #1a1a1a;
+  color: #FFFFFF;
   border: 1px solid var(--accent-dark);
   padding: 11px 18px;
   border-radius: 100px;
@@ -1479,7 +1503,7 @@ body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
-.floating-chat-bubble:hover { background: #FFC93C; }
+.floating-chat-bubble:hover { background: var(--accent-dark); }
 .floating-chat-bubble svg { width: 18px; height: 18px; }
 .floating-chat-bubble .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-faint); flex-shrink: 0; }
 .floating-chat.open .floating-chat-bubble { display: none; }
@@ -1566,7 +1590,7 @@ body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
 .chat-input-row button {
   background: var(--accent);
   border: 1px solid var(--accent-dark);
-  color: #1a1a1a;
+  color: #FFFFFF;
   font-family: var(--font-label);
   font-weight: 600;
   text-transform: uppercase;
@@ -1576,7 +1600,7 @@ body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
   cursor: pointer;
   box-shadow: var(--bevel);
 }
-.chat-input-row button:hover { background: #FFC93C; }
+.chat-input-row button:hover { background: var(--accent-dark); }
 .chat-input-row button:disabled { opacity: 0.5; cursor: default; }
 .chat-attach-btn {
   background: var(--bg-panel-2) !important;
