@@ -137,6 +137,21 @@ function applyIndustryLabels(industry) {
   }
 }
 
+// ===== Feature tiers (Basic / Medium / Full Suite) — chosen per project at creation =====
+const TIER_RANK = { basic: 0, medium: 1, full: 2 };
+function applyTierVisibility(tier) {
+  const rank = TIER_RANK[tier] ?? TIER_RANK.full;
+  document.querySelectorAll(".tab[data-tier]").forEach((tab) => {
+    const tabRank = TIER_RANK[tab.dataset.tier] ?? TIER_RANK.basic;
+    tab.classList.toggle("tier-hidden", tabRank > rank);
+  });
+  const activeView = document.querySelector(".view.active");
+  if (activeView) {
+    const activeTab = document.querySelector(`.tab[data-view="${activeView.id.replace("view-", "")}"]`);
+    if (activeTab && activeTab.classList.contains("tier-hidden")) switchView("dashboard");
+  }
+}
+
 const SAMPLES = {
   gantt: [
     { id: 1, name: "Mobilization & permits", start: "2026-08-03", end: "2026-08-09", progress: 100 },
@@ -269,9 +284,11 @@ function showLanding() { document.body.setAttribute("data-theme", "neutral"); sh
 
 // ===== New Project modal =====
 let modalCallback = null;
-function promptNewProject(onCreate, defaultType) {
+function promptNewProject(onCreate, defaultType, defaultTier) {
   document.getElementById("modalProjectName").value = "";
   document.getElementById("modalProjectType").value = defaultType || "Residential";
+  const tierValue = defaultTier || "full";
+  document.querySelectorAll('input[name="modalProjectTier"]').forEach((r) => { r.checked = r.value === tierValue; });
   document.getElementById("newProjectModalOverlay").style.display = "flex";
   document.getElementById("modalProjectName").focus();
   modalCallback = onCreate;
@@ -281,10 +298,12 @@ document.getElementById("modalCancel").addEventListener("click", closeNewProject
 document.getElementById("modalCreate").addEventListener("click", () => {
   const name = document.getElementById("modalProjectName").value.trim();
   const type = document.getElementById("modalProjectType").value;
+  const tierInput = document.querySelector('input[name="modalProjectTier"]:checked');
+  const tier = tierInput ? tierInput.value : "full";
   if (!name) { alert("Please enter a project name."); return; }
   const cb = modalCallback;
   closeNewProjectModal();
-  if (cb) cb(name, type);
+  if (cb) cb(name, type, tier);
 });
 document.getElementById("modalProjectName").addEventListener("keydown", (e) => {
   if (e.key === "Enter") { e.preventDefault(); document.getElementById("modalCreate").click(); }
@@ -729,9 +748,9 @@ function saveAllProjects(projects) {
   saveAllProjectsLocal(projects);
   TracklineCloud.syncProjects(projects);
 }
-function newProjectState(name, type) {
+function newProjectState(name, type, tier) {
   return {
-    name, type: type || "",
+    name, type: type || "", tier: tier || "full",
     charts: {
       gantt: null, burndown: null, kanban: null, raid: null, dailylog: null, submittals: null, punchlist: null,
       team: null, timesheets: null, budget: null, materials: null, attendance: null, machinery: null,
@@ -780,6 +799,7 @@ function loadProjectIntoApp(project) {
   chatLogData = project.chatLog ? [...project.chatLog] : [];
 
   applyIndustryLabels(industryFromType(project.type));
+  applyTierVisibility(project.tier || "full");
 
   renderGantt(state.gantt);
   renderBurndown(state.burndown);
@@ -842,7 +862,7 @@ function switchActiveProject(id) {
 document.getElementById("projectSelect").addEventListener("change", (e) => { switchActiveProject(e.target.value); setTicker("SYSTEM READY · SWITCHED PROJECT"); });
 document.getElementById("btnNewProject").addEventListener("click", () => {
   const currentTab = document.querySelector(".tab.active")?.dataset.view || "dashboard";
-  promptNewProject((name, type) => createProjectAndOpen(name, type, currentTab, false));
+  promptNewProject((name, type, tier) => createProjectAndOpen(name, type, tier, currentTab, false));
 });
 document.getElementById("btnRenameProject").addEventListener("click", () => {
   const projects = loadAllProjects();
@@ -868,11 +888,11 @@ document.getElementById("btnDeleteProject").addEventListener("click", () => {
   renderProjectSelector();
 });
 
-function createProjectAndOpen(name, type, tab, goToApp = true) {
+function createProjectAndOpen(name, type, tier, tab, goToApp = true) {
   persistActiveProject();
   const projects = loadAllProjects();
   const id = "p_" + Date.now();
-  projects[id] = newProjectState(name, type);
+  projects[id] = newProjectState(name, type, tier);
   saveAllProjects(projects);
   activeProjectId = id;
   localStorage.setItem(ACTIVE_KEY, id);
@@ -2550,7 +2570,7 @@ function renderBrowseGrid(type) {
   matches.sort((a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0));
   if (!matches.length) {
     grid.innerHTML = `<div class="browse-empty"><p>${CHART_META[type].empty}</p><button class="btn-primary" id="browseEmptyAdd"><span>＋</span> Add New Project</button></div>`;
-    document.getElementById("browseEmptyAdd").addEventListener("click", () => { promptNewProject((name, ptype) => createProjectAndOpen(name, ptype, type, true)); });
+    document.getElementById("browseEmptyAdd").addEventListener("click", () => { promptNewProject((name, ptype, tier) => createProjectAndOpen(name, ptype, tier, type, true)); });
     return;
   }
   grid.innerHTML = matches.map(([id, p]) => `
@@ -2564,7 +2584,7 @@ function renderBrowseGrid(type) {
     card.addEventListener("click", () => { switchActiveProject(card.dataset.projectId); showApp(); switchView(type); });
   });
 }
-document.getElementById("browseAddNew").addEventListener("click", () => { promptNewProject((name, type) => createProjectAndOpen(name, type, currentBrowseType, true)); });
+document.getElementById("browseAddNew").addEventListener("click", () => { promptNewProject((name, type, tier) => createProjectAndOpen(name, type, tier, currentBrowseType, true)); });
 document.querySelectorAll('[data-browse]').forEach((card) => {
   card.addEventListener("click", () => openBrowse(card.dataset.browse));
   card.addEventListener("keydown", (e) => { if (e.key === "Enter") openBrowse(card.dataset.browse); });
@@ -2630,7 +2650,7 @@ function renderPortfolioGrid() {
   if (!entries.length) {
     const label = portfolioIndustryFilter ? INDUSTRY_DISPLAY[portfolioIndustryFilter].toLowerCase() : "";
     grid.innerHTML = `<div class="portfolio-empty"><p>No ${label ? label + " " : ""}projects yet.</p><button class="btn-primary" id="portfolioEmptyAdd"><span>＋</span> Add New Project</button></div>`;
-    document.getElementById("portfolioEmptyAdd").addEventListener("click", () => { promptNewProject((name, type) => createProjectAndOpen(name, type, "dashboard", true), defaultType); });
+    document.getElementById("portfolioEmptyAdd").addEventListener("click", () => { promptNewProject((name, type, tier) => createProjectAndOpen(name, type, tier, "dashboard", true), defaultType); });
     return;
   }
   grid.innerHTML = entries.map(([id, p]) => {
@@ -2653,7 +2673,7 @@ function renderPortfolioGrid() {
 }
 document.getElementById("portfolioAddNew").addEventListener("click", () => {
   const defaultType = portfolioIndustryFilter ? INDUSTRY_DEFAULT_TYPE[portfolioIndustryFilter] : "Residential";
-  promptNewProject((name, type) => createProjectAndOpen(name, type, "dashboard", true), defaultType);
+  promptNewProject((name, type, tier) => createProjectAndOpen(name, type, tier, "dashboard", true), defaultType);
 });
 document.getElementById("navPortfolio").addEventListener("click", (e) => { e.preventDefault(); openPortfolio(null); });
 document.getElementById("backToLandingFromPortfolio").addEventListener("click", (e) => { e.preventDefault(); portfolioIndustryFilter = null; showLanding(); renderIndustryCounts(); });
@@ -2675,7 +2695,7 @@ function renderChatHistoryList() {
   }).join("");
   list.querySelectorAll(".chat-history-item").forEach((item) => { item.addEventListener("click", () => { switchActiveProject(item.dataset.projectId); renderChatHistoryList(); }); });
 }
-document.getElementById("btnNewChat").addEventListener("click", () => { createProjectAndOpen("New chat", "", "dashboard", false); renderChatHistoryList(); });
+document.getElementById("btnNewChat").addEventListener("click", () => { createProjectAndOpen("New chat", "", "full", "dashboard", false); renderChatHistoryList(); });
 document.getElementById("backToLandingFromChat").addEventListener("click", (e) => { e.preventDefault(); showLanding(); });
 document.getElementById("brandHomeChat").addEventListener("click", () => showLanding());
 

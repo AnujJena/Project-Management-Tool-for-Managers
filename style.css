@@ -62,6 +62,8 @@ body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
 .sidebar-nav-list .tab.industry-tab.industry-visible { display: flex; }
 /* Construction-only tabs: hidden via JS for Marketing Research / Consulting projects */
 .sidebar-nav-list .tab.construction-only-tab.industry-hidden { display: none; }
+/* Tier-gated tabs: hidden via JS when the project's chosen feature set doesn't include them */
+.sidebar-nav-list .tab.tier-hidden { display: none !important; }
 
 /* ================= Login gate ================= */
 #loginView { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
@@ -1207,6 +1209,21 @@ body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
 .status-radio-option { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); }
 .status-radio-option input[type="radio"] { accent-color: var(--accent); cursor: pointer; margin: 0; }
 .status-radio-option.checked { color: var(--text); font-weight: 600; }
+
+.tier-picker { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
+.tier-option {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 9px 12px;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.tier-option input[type="radio"] { accent-color: var(--accent); cursor: pointer; margin: 3px 0 0; }
+.tier-option:has(input:checked) { border-color: var(--accent); background: var(--accent-dim); }
+.tier-option div { display: flex; flex-direction: column; gap: 2px; }
+.tier-option strong { font-family: var(--font-label); font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text); }
+.tier-option span { font-size: 11.5px; color: var(--text-faint); line-height: 1.4; }
 
 /* ---------- Health score gauge (Dashboard) ---------- */
 .health-banner {
