@@ -220,7 +220,7 @@ async function verifyUser(accessToken) {
   return user && user.id ? { id: user.id, email: (user.email || "").toLowerCase() } : null;
 }
 
-// Atomically increments today's message count for this user and reports whether they're still under the cap.
+// Atomically increments today's message count for this user and reports the new count plus whether they're still under the cap.
 async function checkAndIncrementUsage(userId) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/increment_chat_usage`, {
     method: "POST",
@@ -232,11 +232,41 @@ async function checkAndIncrementUsage(userId) {
     body: JSON.stringify({ p_user_id: userId, p_limit: CHAT_DAILY_LIMIT }),
   });
   if (!res.ok) throw new Error("usage check failed");
-  return res.json(); // boolean: true if still within the daily limit
+  return res.json(); // { count, allowed }
+}
+
+// Read-only lookup of today's count so far, without incrementing it.
+async function getUsage(userId) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_chat_usage`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+    },
+    body: JSON.stringify({ p_user_id: userId }),
+  });
+  if (!res.ok) throw new Error("usage lookup failed");
+  return res.json(); // int
 }
 
 module.exports = async (req, res) => {
-  if (req.method === "GET") { res.status(200).json({ configured: Boolean(process.env.ANTHROPIC_API_KEY) }); return; }
+  if (req.method === "GET") {
+    const configured = Boolean(process.env.ANTHROPIC_API_KEY);
+    const authHeader = req.headers.authorization || "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    if (!token || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) { res.status(200).json({ configured }); return; }
+    try {
+      const user = await verifyUser(token);
+      if (!user) { res.status(200).json({ configured }); return; }
+      if (ADMIN_EMAILS.includes(user.email)) { res.status(200).json({ configured, unlimited: true }); return; }
+      const used = await getUsage(user.id);
+      res.status(200).json({ configured, used, limit: CHAT_DAILY_LIMIT });
+    } catch (err) {
+      res.status(200).json({ configured });
+    }
+    return;
+  }
   if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -256,11 +286,13 @@ module.exports = async (req, res) => {
   if (!user) { res.status(401).json({ error: "Your session has expired. Please sign in again." }); return; }
 
   const isAdmin = ADMIN_EMAILS.includes(user.email);
+  let usage = isAdmin ? { unlimited: true } : null;
   if (!isAdmin) {
     try {
-      const withinLimit = await checkAndIncrementUsage(user.id);
-      if (!withinLimit) {
-        res.status(429).json({ error: `You've reached today's AI assistant limit (${CHAT_DAILY_LIMIT} messages). It resets at midnight.` });
+      const result = await checkAndIncrementUsage(user.id);
+      usage = { used: result.count, limit: CHAT_DAILY_LIMIT };
+      if (!result.allowed) {
+        res.status(429).json({ error: `You've reached today's AI assistant limit (${CHAT_DAILY_LIMIT} messages). It resets at midnight.`, usage });
         return;
       }
     } catch (err) {
@@ -290,7 +322,7 @@ module.exports = async (req, res) => {
     if (!apiRes.ok) { res.status(apiRes.status).json({ error: data?.error?.message || "Anthropic API request failed" }); return; }
 
     const reply = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n");
-    res.status(200).json({ reply });
+    res.status(200).json({ reply, usage });
   } catch (err) {
     res.status(500).json({ error: "Unexpected server error" });
   }

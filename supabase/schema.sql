@@ -44,12 +44,14 @@ create table if not exists public.chat_usage (
 );
 alter table public.chat_usage enable row level security;
 
--- Atomically increments today's usage count and reports whether the user is
--- still within their daily limit. `security definer` lets it write to
--- chat_usage even though RLS on that table has no policies for normal roles;
--- it's only ever invoked by the serverless function with the service role key.
-create or replace function public.increment_chat_usage(p_user_id uuid, p_limit int)
-returns boolean
+-- Atomically increments today's usage count and reports the new count plus
+-- whether the user is still within their daily limit. `security definer` lets
+-- it write to chat_usage even though RLS on that table has no policies for
+-- normal roles; it's only ever invoked by the serverless function with the
+-- service role key.
+drop function if exists public.increment_chat_usage(uuid, int);
+create function public.increment_chat_usage(p_user_id uuid, p_limit int)
+returns jsonb
 language plpgsql
 security definer
 set search_path = public
@@ -63,6 +65,17 @@ begin
   do update set count = chat_usage.count + 1
   returning count into current_count;
 
-  return current_count <= p_limit;
+  return jsonb_build_object('count', current_count, 'allowed', current_count <= p_limit);
 end;
+$$;
+
+-- Read-only lookup of today's usage count, without incrementing it — used to
+-- show a usage bar in the UI before the user has sent a message today.
+create or replace function public.get_chat_usage(p_user_id uuid)
+returns int
+language sql
+security definer
+set search_path = public
+as $$
+  select coalesce((select count from public.chat_usage where user_id = p_user_id and day = current_date), 0);
 $$;

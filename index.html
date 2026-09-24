@@ -20,7 +20,12 @@
       <label for="loginEmail">Email</label>
       <input type="email" id="loginEmail" autocomplete="email" required>
       <label for="loginPassword">Password</label>
-      <input type="password" id="loginPassword" autocomplete="current-password" required minlength="6">
+      <div class="password-field">
+        <input type="password" id="loginPassword" autocomplete="current-password" required minlength="6">
+        <button type="button" class="password-toggle" id="loginPasswordToggle" aria-label="Show password" title="Show password">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/></svg>
+        </button>
+      </div>
       <div class="modal-actions" style="margin-top:18px;">
         <button type="submit" class="btn-primary btn-block" id="loginSubmit">Sign In</button>
       </div>
@@ -126,6 +131,10 @@
       <div class="chat-history-list" id="chatHistoryList"></div>
     </aside>
     <section class="chatpage-main">
+      <div class="usage-bar" id="usageBarPage" style="display:none;">
+        <div class="usage-bar-track"><div class="usage-bar-fill" id="usageBarFillPage"></div></div>
+        <span class="usage-bar-text" id="usageBarTextPage"></span>
+      </div>
       <div class="chat-log" id="chatLogPage"></div>
       <form class="chat-input-row" id="chatFormPage">
         <textarea id="chatInputPage" placeholder="Ask a PM question, or describe/edit anything…" rows="2"></textarea>
@@ -564,6 +573,10 @@
         <span class="status-chip" id="apiStatus"><span class="dot" id="apiDot"></span><span id="apiStatusText">Checking key…</span></span>
         <button class="floating-chat-minimize" id="floatingChatMinimize" title="Minimize" aria-label="Minimize chat">─</button>
       </div>
+    </div>
+    <div class="usage-bar" id="usageBar" style="display:none;">
+      <div class="usage-bar-track"><div class="usage-bar-fill" id="usageBarFill"></div></div>
+      <span class="usage-bar-text" id="usageBarText"></span>
     </div>
     <div class="chat-log" id="chatLog"></div>
     <form class="chat-input-row" id="chatForm">

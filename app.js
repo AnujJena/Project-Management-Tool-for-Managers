@@ -2668,9 +2668,40 @@ document.getElementById("brandHomeChat").addEventListener("click", () => showLan
 
 // ===================== CHAT (shared logic, two mount points) =====================
 const CHAT_MOUNTS = [
-  { log: "chatLog", form: "chatForm", input: "chatInput", send: "chatSend" },
-  { log: "chatLogPage", form: "chatFormPage", input: "chatInputPage", send: "chatSendPage" },
+  { log: "chatLog", form: "chatForm", input: "chatInput", send: "chatSend", usageBar: "usageBar", usageFill: "usageBarFill", usageText: "usageBarText" },
+  { log: "chatLogPage", form: "chatFormPage", input: "chatInputPage", send: "chatSendPage", usageBar: "usageBarPage", usageFill: "usageBarFillPage", usageText: "usageBarTextPage" },
 ];
+
+// Updates the usage bar(s) from a { used, limit } or { unlimited: true } payload.
+function updateUsageBar(usage) {
+  if (!usage) return;
+  CHAT_MOUNTS.forEach((m) => {
+    const bar = document.getElementById(m.usageBar);
+    const fill = document.getElementById(m.usageFill);
+    const text = document.getElementById(m.usageText);
+    if (!bar || !fill || !text) return;
+    bar.style.display = "flex";
+    if (usage.unlimited) {
+      fill.style.width = "100%";
+      fill.classList.remove("usage-high", "usage-full");
+      text.textContent = "Unlimited";
+      return;
+    }
+    const pct = usage.limit ? Math.min(100, Math.round((usage.used / usage.limit) * 100)) : 0;
+    fill.style.width = `${pct}%`;
+    fill.classList.toggle("usage-full", usage.used >= usage.limit);
+    fill.classList.toggle("usage-high", !fill.classList.contains("usage-full") && pct >= 70);
+    text.textContent = `${usage.used} / ${usage.limit} today`;
+  });
+}
+async function refreshUsage() {
+  try {
+    const res = await fetch("/api/chat", { method: "GET", headers: chatRequestHeaders() });
+    const data = await res.json();
+    if (data.unlimited) updateUsageBar({ unlimited: true });
+    else if (typeof data.used === "number") updateUsageBar({ used: data.used, limit: data.limit });
+  } catch (e) { /* non-critical */ }
+}
 const VIEW_LABELS = { gantt: "Schedule", kanban: "Site Tasks", burndown: "Progress", raid: "RAID Log", dailylog: "Daily Log", submittals: "Submittals/RFI", punchlist: "Punch List", team: "Team", budget: "Budget", calendar: "Calendar", dashboard: "Dashboard", siteops: "Site Ops", charter: "Charter", crashing: "Crashing", wbs: "WBS", inventory: "Inventory", floorplan: "Floor Plan", findings: "Research Findings", billing: "Billable Hours" };
 
 function addMessage(role, text) { chatLogData.push({ kind: role, text }); CHAT_MOUNTS.forEach((m) => renderChatBubble(document.getElementById(m.log), role, text)); }
@@ -2895,9 +2926,11 @@ async function sendChatMessage(text) {
     });
     const data = await res.json();
     if (!res.ok) {
+      if (data.usage) updateUsageBar(data.usage);
       if (res.status === 429) { addMessage("assistant", data.error || "You've hit today's AI assistant limit."); setTicker("DAILY AI LIMIT REACHED"); return; }
       addMessage("assistant", `Error: ${data.error || "the assistant is unavailable right now."}`); setTicker("SYSTEM ERROR · CHECK API KEY CONFIGURATION"); return;
     }
+    updateUsageBar(data.usage);
     const reply = data.reply || "";
     history.push({ role: "assistant", content: reply });
     handleAssistantReply(reply);
@@ -2966,5 +2999,5 @@ document.getElementById("brandHome").addEventListener("click", () => { persistAc
 })();
 
 // ===== Boot (waits for auth.js to confirm a signed-in session) =====
-function bootApp() { initProjects(); boot(); }
+function bootApp() { initProjects(); boot(); refreshUsage(); }
 if (window.TracklineAuthReady) { window.TracklineAuthReady.then(bootApp); } else { bootApp(); }

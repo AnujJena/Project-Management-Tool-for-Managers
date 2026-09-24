@@ -81,6 +81,18 @@ body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
 .login-box input:focus { outline: none; border-color: var(--accent); }
 .login-error { color: var(--danger); font-size: 12.5px; margin-top: 10px; }
 
+.password-field { position: relative; }
+.password-field input { padding-right: 40px; }
+.password-toggle {
+  position: absolute; top: 0; right: 0; bottom: 0;
+  width: 38px;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: none; color: var(--text-faint); cursor: pointer;
+}
+.password-toggle:hover { color: var(--accent); }
+.password-toggle svg { width: 18px; height: 18px; }
+.password-toggle.showing svg circle { fill: currentColor; }
+
 /* ================= Highlighted tab (Charter) ================= */
 .tab-highlight {
   background: var(--accent-dim) !important;
@@ -1366,6 +1378,13 @@ body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
 .floating-chat.open .floating-chat-window { display: flex; }
 
 .copilot-head { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-shrink: 0; }
+.usage-bar { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.usage-bar-track { flex: 1; height: 5px; background: var(--bg-panel-2); border-radius: 3px; overflow: hidden; }
+.usage-bar-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.2s ease, background 0.2s ease; }
+.usage-bar-fill.usage-high { background: var(--accent-2); }
+.usage-bar-fill.usage-full { background: var(--danger); }
+.usage-bar-text { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-faint); white-space: nowrap; }
+.chatpage-main .usage-bar { max-width: 760px; width: 100%; margin: 0 auto; padding: 12px 24px 0; border-bottom: none; }
 .copilot-head-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .copilot-title { font-family: var(--font-label); font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; display: block; color: var(--text); }
 .copilot-head-right .status-chip { font-size: 10px; padding: 4px 8px; white-space: nowrap; }

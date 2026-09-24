@@ -80,6 +80,17 @@ async function signOut() {
 document.getElementById("logoutBtnApp").addEventListener("click", signOut);
 document.getElementById("logoutLinkLanding").addEventListener("click", (e) => { e.preventDefault(); signOut(); });
 
+// ===== Password visibility toggle =====
+document.getElementById("loginPasswordToggle").addEventListener("click", () => {
+  const input = document.getElementById("loginPassword");
+  const btn = document.getElementById("loginPasswordToggle");
+  const showing = input.type === "text";
+  input.type = showing ? "password" : "text";
+  btn.classList.toggle("showing", !showing);
+  btn.title = showing ? "Show password" : "Hide password";
+  btn.setAttribute("aria-label", btn.title);
+});
+
 // ===== Login / sign-up form =====
 let authMode = "signin"; // "signin" | "signup"
 document.getElementById("loginToggleLink").addEventListener("click", (e) => {
