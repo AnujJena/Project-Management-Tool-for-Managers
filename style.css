@@ -938,7 +938,8 @@ body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
   border-bottom: 1px solid var(--grid-line);
 }
 .gantt-task-name { font-size: 13px; padding-right: 8px; display: flex; align-items: center; justify-content: space-between; gap: 6px; }
-.gantt-task-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gantt-task-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.gantt-task-name-text:hover { color: var(--accent); }
 .gantt-name-delete {
   flex-shrink: 0;
   background: transparent; border: 1px solid var(--border-strong); color: var(--text-faint);
@@ -993,10 +994,10 @@ body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
   background: var(--bg-panel-2); color: var(--text-faint);
   font-size: 10px; line-height: 1;
   display: flex; align-items: center; justify-content: center;
-  cursor: pointer; opacity: 0; transition: opacity 0.15s ease;
+  cursor: pointer; opacity: 0.6; transition: opacity 0.15s ease;
   z-index: 3;
 }
-.gantt-bar:hover .gantt-bar-delete { opacity: 1; }
+.gantt-bar:hover .gantt-bar-delete, .gantt-bar-delete:focus-visible { opacity: 1; }
 .gantt-bar-delete:hover { background: var(--danger); color: #fff; }
 .gantt-bar-label {
   position: absolute;
@@ -1006,6 +1007,8 @@ body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
   font-size: 10px;
   color: var(--text);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   pointer-events: none;
 }
 

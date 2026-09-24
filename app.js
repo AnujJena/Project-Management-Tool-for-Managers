@@ -500,28 +500,54 @@ const FIELD_BUILDERS = {
   `,
 };
 
-function openAddModal(type) {
+function openAddModal(type, editId) {
   ensureCollection(type);
-  document.getElementById("addItemModalTitle").textContent = addTitleFor(type);
+  const overlay = document.getElementById("addItemModalOverlay");
   document.getElementById("addItemModalFields").innerHTML = FIELD_BUILDERS[type]();
-  document.getElementById("addItemModalOverlay").dataset.type = type;
-  document.getElementById("addItemModalOverlay").style.display = "flex";
+  overlay.dataset.type = type;
+  if (editId != null) overlay.dataset.editId = editId; else delete overlay.dataset.editId;
+  document.getElementById("addItemModalTitle").textContent = editId != null ? `Edit ${addTitleFor(type).replace(/^Add /, "")}` : addTitleFor(type);
+  document.getElementById("addItemSubmit").textContent = editId != null ? "Save" : "Add";
+
+  if (type === "gantt" && editId != null) {
+    const task = state.gantt.find((t) => String(t.id) === String(editId));
+    if (task) {
+      document.getElementById("af-name").value = task.name;
+      document.getElementById("af-start").value = task.start;
+      document.getElementById("af-end").value = task.end;
+      document.getElementById("af-progress").value = task.progress || 0;
+    }
+  }
+
+  overlay.style.display = "flex";
   const firstInput = document.querySelector("#addItemModalFields input, #addItemModalFields select, #addItemModalFields textarea");
   if (firstInput) firstInput.focus();
 }
-function closeAddModal() { document.getElementById("addItemModalOverlay").style.display = "none"; }
+function closeAddModal() {
+  document.getElementById("addItemModalOverlay").style.display = "none";
+  delete document.getElementById("addItemModalOverlay").dataset.editId;
+  document.getElementById("addItemSubmit").textContent = "Add";
+}
 document.getElementById("addItemCancel").addEventListener("click", closeAddModal);
 document.querySelectorAll("[data-add-type]").forEach((btn) => { btn.addEventListener("click", () => openAddModal(btn.dataset.addType)); });
 
 document.getElementById("addItemSubmit").addEventListener("click", () => {
   const type = document.getElementById("addItemModalOverlay").dataset.type;
+  const editId = document.getElementById("addItemModalOverlay").dataset.editId;
   const val = (id) => { const el = document.getElementById(`af-${id}`); return el ? el.value.trim() : ""; };
 
   if (type === "gantt") {
     const name = val("name"), start = val("start"), end = val("end");
     if (!name || !start || !end) { alert("Please fill in task name, start date, and end date."); return; }
-    const nextId = state.gantt.length ? Math.max(...state.gantt.map((t) => Number(t.id) || 0)) + 1 : 1;
-    state.gantt.push({ id: nextId, name, start, end, progress: Number(val("progress")) || 0 });
+    if (end < start) { alert("End date can't be before the start date."); return; }
+    const progress = Math.max(0, Math.min(100, Number(val("progress")) || 0));
+    if (editId != null) {
+      const task = state.gantt.find((t) => String(t.id) === String(editId));
+      if (task) { task.name = name; task.start = start; task.end = end; task.progress = progress; }
+    } else {
+      const nextId = state.gantt.length ? Math.max(...state.gantt.map((t) => Number(t.id) || 0)) + 1 : 1;
+      state.gantt.push({ id: nextId, name, start, end, progress });
+    }
     renderGantt(state.gantt);
   } else if (type === "kanban") {
     const title = val("title"), columnName = val("column");
@@ -645,7 +671,15 @@ document.getElementById("addItemSubmit").addEventListener("click", () => {
 
   persistActiveProject();
   closeAddModal();
-  triggerPropagationCheck(`Added a new entry to ${MODULE_LABEL_FOR_TYPE[type] || type}.`);
+  triggerPropagationCheck(editId != null
+    ? `Edited an entry in ${MODULE_LABEL_FOR_TYPE[type] || type}.`
+    : `Added a new entry to ${MODULE_LABEL_FOR_TYPE[type] || type}.`);
+});
+
+// ===== Double-click a Gantt task name to edit it precisely =====
+document.addEventListener("dblclick", (e) => {
+  const nameEl = e.target.closest("[data-edit-task]");
+  if (nameEl) openAddModal("gantt", nameEl.dataset.editTask);
 });
 
 // ===== Delete row/card (event delegation) =====
@@ -1086,8 +1120,8 @@ function renderGantt(tasks) {
     const widthPct = (durDays / totalDays) * 100;
     rows += `
       <div class="gantt-row">
-        <div class="gantt-task-name gantt-sticky-col" title="${escapeHtml(t.name)}">
-          <span class="gantt-task-name-text">${escapeHtml(t.name)}</span>
+        <div class="gantt-task-name gantt-sticky-col" title="${escapeHtml(t.name)} (double-click to edit)">
+          <span class="gantt-task-name-text" data-edit-task="${t.id}">${escapeHtml(t.name)}</span>
           <button class="gantt-name-delete" data-del="gantt:${t.id}" title="Delete task">×</button>
         </div>
         <div class="gantt-track">
@@ -1098,7 +1132,7 @@ function renderGantt(tasks) {
             <div class="gantt-handle gantt-handle-right" title="Drag to change end date"></div>
             <button class="gantt-bar-delete" data-del="gantt:${t.id}" title="Delete task">×</button>
           </div>
-          <div class="gantt-bar-label" style="left:calc(${leftPct}% + 8px)">${escapeHtml(t.name)} · ${t.progress || 0}%</div>
+          <div class="gantt-bar-label" style="left:calc(${leftPct}% + 8px); max-width:calc(${Math.max(0, 100 - leftPct)}% - 12px);">${escapeHtml(t.name)} · ${t.progress || 0}%</div>
         </div>
       </div>`;
   });
@@ -1112,6 +1146,11 @@ function attachGanttDragEvents(minDate, totalDays) {
     const taskId = barEl.dataset.taskId;
     const track = barEl.parentElement;
     const fillEl = barEl.querySelector(".gantt-bar-fill");
+
+    barEl.addEventListener("dblclick", (e) => {
+      if (e.target.closest(".gantt-bar-delete")) return;
+      openAddModal("gantt", taskId);
+    });
 
     barEl.addEventListener("pointerdown", (e) => {
       if (e.target.closest(".gantt-bar-fill") || e.target.closest(".gantt-bar-delete")) return; // handled by their own listeners
