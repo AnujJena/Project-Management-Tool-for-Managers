@@ -239,7 +239,19 @@
 <div class="app-header-group" id="appHeaderGroup">
 <header class="topbar">
   <div class="brand" id="brandHome" role="button" tabindex="0" title="Back to home"><span class="brand-mark">⚙</span><span class="brand-name">TRACKLINE</span></div>
+
+  <nav class="topbar-links">
+    <a href="#" id="topbarNavPortfolio">All Projects</a>
+    <a href="#" id="topbarNavChatHistory">Chat History</a>
+  </nav>
+
+  <div class="topbar-search">
+    <input type="text" id="topbarSearchInput" placeholder="Search this project…" autocomplete="off">
+    <div class="topbar-search-results" id="topbarSearchResults" style="display:none;"></div>
+  </div>
+
   <div class="topbar-account">
+    <span class="sync-status" id="syncStatus" style="display:none;"><span class="dot" id="syncDot"></span><span id="syncStatusText">Synced</span></span>
     <span class="account-email" id="accountEmailApp"></span>
     <button class="btn-tiny" id="logoutBtnApp" title="Log out">Log out</button>
   </div>

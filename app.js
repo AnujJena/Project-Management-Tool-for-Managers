@@ -679,6 +679,17 @@ function saveAllProjectsLocal(projects) { try { localStorage.setItem(STORAGE_KEY
 // Thin cloud-sync layer: every save pushes the current project set to Supabase
 // (fire-and-forget) so it survives across devices/browsers. localStorage stays
 // the fast local cache and the only thing the rest of this file reads from.
+function setSyncStatus(status) {
+  // status: "saving" | "synced" | "error"
+  const wrap = document.getElementById("syncStatus");
+  const dot = document.getElementById("syncDot");
+  const text = document.getElementById("syncStatusText");
+  if (!wrap || !dot || !text) return;
+  wrap.style.display = "flex";
+  dot.className = "dot" + (status === "saving" ? " saving" : status === "error" ? " bad" : " ok");
+  text.textContent = status === "saving" ? "Saving…" : status === "error" ? "Sync error" : "Synced";
+}
+
 const TracklineCloud = (function () {
   let lastIds = new Set();
   function setInitialIds(ids) { lastIds = new Set(ids); }
@@ -690,23 +701,25 @@ const TracklineCloud = (function () {
     const userId = session.user.id;
     const nextIds = new Set(Object.keys(projects));
 
+    setSyncStatus("saving");
+    const tasks = [];
+
     const deletedIds = [...lastIds].filter((id) => !nextIds.has(id));
     for (const id of deletedIds) {
-      client.from("projects").delete().eq("id", id).eq("user_id", userId).then(({ error }) => {
-        if (error) console.error("Cloud delete failed", error);
-      });
+      tasks.push(client.from("projects").delete().eq("id", id).eq("user_id", userId));
     }
 
     const rows = Object.entries(projects).map(([id, p]) => ({
       id, user_id: userId, name: p.name || "Untitled Project", type: p.type || "",
       data: p, updated_at: new Date().toISOString(),
     }));
-    if (rows.length) {
-      client.from("projects").upsert(rows).then(({ error }) => {
-        if (error) console.error("Cloud save failed", error);
-      });
-    }
+    if (rows.length) tasks.push(client.from("projects").upsert(rows));
+
     lastIds = nextIds;
+    const results = await Promise.allSettled(tasks);
+    const failed = results.some((r) => r.status === "rejected" || (r.value && r.value.error));
+    if (failed) { results.forEach((r) => { if (r.value && r.value.error) console.error("Cloud sync failed", r.value.error); }); setSyncStatus("error"); }
+    else setSyncStatus("synced");
   }
   return { setInitialIds, syncProjects };
 })();
@@ -2984,6 +2997,67 @@ document.getElementById("btnSetupEntireProject").addEventListener("click", setup
 
 // ===== Landing page misc =====
 document.getElementById("brandHome").addEventListener("click", () => { persistActiveProject(); showLanding(); renderIndustryCounts(); });
+
+// ===== Topbar quick nav (appView) =====
+document.getElementById("topbarNavPortfolio").addEventListener("click", (e) => { e.preventDefault(); persistActiveProject(); openPortfolio(null); });
+document.getElementById("topbarNavChatHistory").addEventListener("click", (e) => { e.preventDefault(); persistActiveProject(); openChatPage(); });
+
+// ===== Topbar global search (current project only) =====
+const STATE_KEY_TO_VIEW = {
+  gantt: "gantt", burndown: "burndown", kanban: "kanban", raid: "raid", dailylog: "dailylog",
+  submittals: "submittals", punchlist: "punchlist", team: "team", timesheets: "team", budget: "budget",
+  materials: "siteops", attendance: "siteops", machinery: "siteops", charter: "charter", crashing: "crashing",
+  wbs: "wbs", inventory: "inventory", floorplan: "floorplan", findings: "findings", billing: "billing",
+};
+function searchProject(query) {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  const results = [];
+  const seen = new Set();
+  function walk(node, stateKey) {
+    if (node == null) return;
+    if (typeof node === "string") {
+      if (node.length > 1 && node.toLowerCase().includes(q)) {
+        const dedupeKey = stateKey + ":" + node;
+        if (!seen.has(dedupeKey)) { seen.add(dedupeKey); results.push({ stateKey, text: node }); }
+      }
+    } else if (Array.isArray(node)) {
+      node.forEach((n) => walk(n, stateKey));
+    } else if (typeof node === "object") {
+      Object.values(node).forEach((v) => walk(v, stateKey));
+    }
+  }
+  Object.keys(STATE_KEY_TO_VIEW).forEach((k) => walk(state[k], k));
+  return results.slice(0, 8);
+}
+function renderSearchResults(results, query) {
+  const box = document.getElementById("topbarSearchResults");
+  if (!query.trim()) { box.style.display = "none"; box.innerHTML = ""; return; }
+  if (!results.length) {
+    box.innerHTML = `<div class="topbar-search-empty">No matches in this project.</div>`;
+  } else {
+    box.innerHTML = results.map((r, i) => `<div class="topbar-search-result" data-idx="${i}">
+      <div class="topbar-search-result-module">${escapeHtml(VIEW_LABELS[STATE_KEY_TO_VIEW[r.stateKey]] || r.stateKey)}</div>
+      <div class="topbar-search-result-text">${escapeHtml(r.text)}</div>
+    </div>`).join("");
+    box.querySelectorAll(".topbar-search-result").forEach((el) => {
+      el.addEventListener("click", () => {
+        const r = results[Number(el.dataset.idx)];
+        showApp();
+        switchView(STATE_KEY_TO_VIEW[r.stateKey]);
+        box.style.display = "none";
+        document.getElementById("topbarSearchInput").value = "";
+      });
+    });
+  }
+  box.style.display = "block";
+}
+const topbarSearchInput = document.getElementById("topbarSearchInput");
+topbarSearchInput.addEventListener("input", () => renderSearchResults(searchProject(topbarSearchInput.value), topbarSearchInput.value));
+topbarSearchInput.addEventListener("focus", () => { if (topbarSearchInput.value.trim()) renderSearchResults(searchProject(topbarSearchInput.value), topbarSearchInput.value); });
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".topbar-search")) document.getElementById("topbarSearchResults").style.display = "none";
+});
 
 // ===== API key status check =====
 (async function checkStatus() {
