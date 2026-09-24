@@ -5,6 +5,7 @@ const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const CHAT_DAILY_LIMIT = parseInt(process.env.CHAT_DAILY_LIMIT || "20", 10);
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
 
 const BASE_SYSTEM_PROMPT = `You are the AI Project Manager inside Trackline, a project console built specifically for construction professionals — general contractors, site supervisors, and construction PMs.
 
@@ -209,14 +210,14 @@ You will be told exactly what changed. Using the full current project state alre
 - If something should change, write one brief sentence per proposed change explaining why, then the json block(s) for those changes only, using the same shapes as above. These will be shown to the user as suggestions to approve, not applied automatically — so it's safe to propose them even if you're not fully certain, as long as the connection is real.
 - Keep your prose extremely brief — a sentence or two total, since this is a background check, not a conversation.`;
 
-// Verifies the caller's Supabase access token and returns their user id, or null if invalid.
+// Verifies the caller's Supabase access token and returns their user id + email, or null if invalid.
 async function verifyUser(accessToken) {
   const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
     headers: { Authorization: `Bearer ${accessToken}`, apikey: SUPABASE_SERVICE_ROLE_KEY },
   });
   if (!res.ok) return null;
   const user = await res.json();
-  return user && user.id ? user.id : null;
+  return user && user.id ? { id: user.id, email: (user.email || "").toLowerCase() } : null;
 }
 
 // Atomically increments today's message count for this user and reports whether they're still under the cap.
@@ -246,22 +247,25 @@ module.exports = async (req, res) => {
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
   if (!token) { res.status(401).json({ error: "Sign in to use the AI assistant." }); return; }
 
-  let userId;
+  let user;
   try {
-    userId = await verifyUser(token);
+    user = await verifyUser(token);
   } catch (err) {
     res.status(500).json({ error: "Couldn't verify your session. Try again." }); return;
   }
-  if (!userId) { res.status(401).json({ error: "Your session has expired. Please sign in again." }); return; }
+  if (!user) { res.status(401).json({ error: "Your session has expired. Please sign in again." }); return; }
 
-  try {
-    const withinLimit = await checkAndIncrementUsage(userId);
-    if (!withinLimit) {
-      res.status(429).json({ error: `You've reached today's AI assistant limit (${CHAT_DAILY_LIMIT} messages). It resets at midnight.` });
-      return;
+  const isAdmin = ADMIN_EMAILS.includes(user.email);
+  if (!isAdmin) {
+    try {
+      const withinLimit = await checkAndIncrementUsage(user.id);
+      if (!withinLimit) {
+        res.status(429).json({ error: `You've reached today's AI assistant limit (${CHAT_DAILY_LIMIT} messages). It resets at midnight.` });
+        return;
+      }
+    } catch (err) {
+      res.status(500).json({ error: "Couldn't check your usage limit. Try again." }); return;
     }
-  } catch (err) {
-    res.status(500).json({ error: "Couldn't check your usage limit. Try again." }); return;
   }
 
   try {
