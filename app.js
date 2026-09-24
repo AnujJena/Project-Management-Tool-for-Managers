@@ -23,6 +23,13 @@ let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 
+function chatRequestHeaders() {
+  const headers = { "Content-Type": "application/json" };
+  const token = window.TracklineAuth && window.TracklineAuth.getAccessToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  return headers;
+}
+
 // ===== Boot straight into the home page (no login gate) =====
 function boot() {
   showLanding();
@@ -665,9 +672,50 @@ function deleteItem(type, id) {
   if (type !== "floorplanpin") triggerPropagationCheck(`Deleted an item from ${MODULE_LABEL_FOR_TYPE[type] || type}.`);
 }
 
-// ===== Projects (localStorage) =====
+// ===== Projects (localStorage, mirrored to Supabase when signed in) =====
 function loadAllProjects() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); } catch { return {}; } }
-function saveAllProjects(projects) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(projects)); } catch (e) { console.error("Storage save failed", e); } }
+function saveAllProjectsLocal(projects) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(projects)); } catch (e) { console.error("Storage save failed", e); } }
+
+// Thin cloud-sync layer: every save pushes the current project set to Supabase
+// (fire-and-forget) so it survives across devices/browsers. localStorage stays
+// the fast local cache and the only thing the rest of this file reads from.
+const TracklineCloud = (function () {
+  let lastIds = new Set();
+  function setInitialIds(ids) { lastIds = new Set(ids); }
+  async function syncProjects(projects) {
+    const auth = window.TracklineAuth;
+    const session = auth && auth.getSession();
+    if (!session) return;
+    const client = auth.client;
+    const userId = session.user.id;
+    const nextIds = new Set(Object.keys(projects));
+
+    const deletedIds = [...lastIds].filter((id) => !nextIds.has(id));
+    for (const id of deletedIds) {
+      client.from("projects").delete().eq("id", id).eq("user_id", userId).then(({ error }) => {
+        if (error) console.error("Cloud delete failed", error);
+      });
+    }
+
+    const rows = Object.entries(projects).map(([id, p]) => ({
+      id, user_id: userId, name: p.name || "Untitled Project", type: p.type || "",
+      data: p, updated_at: new Date().toISOString(),
+    }));
+    if (rows.length) {
+      client.from("projects").upsert(rows).then(({ error }) => {
+        if (error) console.error("Cloud save failed", error);
+      });
+    }
+    lastIds = nextIds;
+  }
+  return { setInitialIds, syncProjects };
+})();
+window.TracklineCloud = TracklineCloud;
+
+function saveAllProjects(projects) {
+  saveAllProjectsLocal(projects);
+  TracklineCloud.syncProjects(projects);
+}
 function newProjectState(name, type) {
   return {
     name, type: type || "",
@@ -2789,7 +2837,7 @@ async function triggerPropagationCheck(description) {
     const projectType = (projects[activeProjectId] && projects[activeProjectId].type) || "";
     const res = await fetch("/api/chat", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: chatRequestHeaders(),
       body: JSON.stringify({
         messages: [{ role: "user", content: `The user just made this edit directly in the app (not through chat): ${description}` }],
         charts: state,
@@ -2842,11 +2890,14 @@ async function sendChatMessage(text) {
     const projects = loadAllProjects();
     const projectType = (projects[activeProjectId] && projects[activeProjectId].type) || "";
     const res = await fetch("/api/chat", {
-      method: "POST", headers: { "Content-Type": "application/json" },
+      method: "POST", headers: chatRequestHeaders(),
       body: JSON.stringify({ messages: trimmedHistory, charts: state, projectType }),
     });
     const data = await res.json();
-    if (!res.ok) { addMessage("assistant", `Error: ${data.error || "the assistant is unavailable right now."}`); setTicker("SYSTEM ERROR · CHECK API KEY CONFIGURATION"); return; }
+    if (!res.ok) {
+      if (res.status === 429) { addMessage("assistant", data.error || "You've hit today's AI assistant limit."); setTicker("DAILY AI LIMIT REACHED"); return; }
+      addMessage("assistant", `Error: ${data.error || "the assistant is unavailable right now."}`); setTicker("SYSTEM ERROR · CHECK API KEY CONFIGURATION"); return;
+    }
     const reply = data.reply || "";
     history.push({ role: "assistant", content: reply });
     handleAssistantReply(reply);
@@ -2914,6 +2965,6 @@ document.getElementById("brandHome").addEventListener("click", () => { persistAc
   } catch { dot.classList.add("bad"); dotBubble.classList.add("bad"); text.textContent = "Server unreachable"; }
 })();
 
-// ===== Boot =====
-initProjects();
-boot();
+// ===== Boot (waits for auth.js to confirm a signed-in session) =====
+function bootApp() { initProjects(); boot(); }
+if (window.TracklineAuthReady) { window.TracklineAuthReady.then(bootApp); } else { bootApp(); }

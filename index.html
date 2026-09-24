@@ -11,8 +11,29 @@
 </head>
 <body>
 
+<!-- ===================== LOGIN GATE ===================== -->
+<div id="loginView">
+  <div class="login-box">
+    <div class="brand" style="margin-bottom:18px;"><span class="brand-mark">⚙</span><span class="brand-name">TRACKLINE</span></div>
+    <p class="login-note">This is a work-in-progress build. Accounts are free — your projects are saved to your account. The AI assistant is capped to a limited number of messages per day per account while this is in testing.</p>
+    <form id="loginForm">
+      <label for="loginEmail">Email</label>
+      <input type="email" id="loginEmail" autocomplete="email" required>
+      <label for="loginPassword">Password</label>
+      <input type="password" id="loginPassword" autocomplete="current-password" required minlength="6">
+      <div class="modal-actions" style="margin-top:18px;">
+        <button type="submit" class="btn-primary btn-block" id="loginSubmit">Sign In</button>
+      </div>
+      <p class="login-error" id="loginError" style="display:none;"></p>
+    </form>
+    <p class="login-note" style="margin-top:16px; margin-bottom:0; text-align:center; background:none; border:none; padding:0;">
+      <span id="loginToggleText">Don't have an account?</span> <a href="#" id="loginToggleLink">Create one</a>
+    </p>
+  </div>
+</div>
+
 <!-- ===================== HOME (industry picker) ===================== -->
-<div id="landingView">
+<div id="landingView" style="display:none;">
 
   <header class="landing-nav">
     <div class="brand">
@@ -22,6 +43,8 @@
     <nav class="landing-links">
       <a href="#" id="navPortfolio">All Projects</a>
       <a href="#" id="navChatHistory">Chat History</a>
+      <span class="account-email" id="accountEmailLanding"></span>
+      <a href="#" id="logoutLinkLanding">Log out</a>
     </nav>
   </header>
   <div class="hazard-strip"></div>
@@ -207,6 +230,10 @@
 <div class="app-header-group" id="appHeaderGroup">
 <header class="topbar">
   <div class="brand" id="brandHome" role="button" tabindex="0" title="Back to home"><span class="brand-mark">⚙</span><span class="brand-name">TRACKLINE</span></div>
+  <div class="topbar-account">
+    <span class="account-email" id="accountEmailApp"></span>
+    <button class="btn-tiny" id="logoutBtnApp" title="Log out">Log out</button>
+  </div>
 </header>
 <div class="hazard-strip"></div>
 
@@ -641,6 +668,8 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="auth.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
