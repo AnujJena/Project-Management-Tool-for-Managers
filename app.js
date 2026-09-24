@@ -1086,16 +1086,23 @@ function renderGantt(tasks) {
     const widthPct = (durDays / totalDays) * 100;
     rows += `
       <div class="gantt-row">
-        <div class="gantt-task-name" title="${escapeHtml(t.name)}">${escapeHtml(t.name)}</div>
+        <div class="gantt-task-name gantt-sticky-col" title="${escapeHtml(t.name)}">
+          <span class="gantt-task-name-text">${escapeHtml(t.name)}</span>
+          <button class="gantt-name-delete" data-del="gantt:${t.id}" title="Delete task">×</button>
+        </div>
         <div class="gantt-track">
           <div class="gantt-track-bg"></div>
-          <div class="gantt-bar" data-task-id="${t.id}" style="left:${leftPct}%; width:${widthPct}%;" title="Drag to move · drag the edges to resize"><div class="gantt-bar-fill" style="width:${t.progress || 0}%;" title="Drag to set progress"></div></div>
+          <div class="gantt-bar" data-task-id="${t.id}" style="left:${leftPct}%; width:${widthPct}%;" title="Drag the middle to move, the edges to resize">
+            <div class="gantt-bar-fill" style="width:${t.progress || 0}%;" title="Drag to set progress"><span class="gantt-progress-handle"></span></div>
+            <div class="gantt-handle gantt-handle-left" title="Drag to change start date"></div>
+            <div class="gantt-handle gantt-handle-right" title="Drag to change end date"></div>
+            <button class="gantt-bar-delete" data-del="gantt:${t.id}" title="Delete task">×</button>
+          </div>
           <div class="gantt-bar-label" style="left:calc(${leftPct}% + 8px)">${escapeHtml(t.name)} · ${t.progress || 0}%</div>
         </div>
-        <button class="row-delete-btn" data-del="gantt:${t.id}" title="Delete task">×</button>
       </div>`;
   });
-  wrap.innerHTML = `<div class="gantt-header"><div>Task</div><div class="gantt-scale">${scaleHtml}</div><div></div></div>${rows}`;
+  wrap.innerHTML = `<div class="gantt-header"><div class="gantt-sticky-col">Task</div><div class="gantt-scale">${scaleHtml}</div></div>${rows}`;
   wrap.style.width = Math.max(640, 260 + weekCount * 90) + "px";
   attachGanttDragEvents(minDate, totalDays);
 }
@@ -1107,12 +1114,10 @@ function attachGanttDragEvents(minDate, totalDays) {
     const fillEl = barEl.querySelector(".gantt-bar-fill");
 
     barEl.addEventListener("pointerdown", (e) => {
+      if (e.target.closest(".gantt-bar-fill") || e.target.closest(".gantt-bar-delete")) return; // handled by their own listeners
+      const mode = e.target.closest(".gantt-handle-left") ? "resize-start" : e.target.closest(".gantt-handle-right") ? "resize-end" : "move";
       const trackRect = track.getBoundingClientRect();
-      const barRect = barEl.getBoundingClientRect();
       const pxPerDay = trackRect.width / totalDays;
-      const edgeZone = 8;
-      const offsetInBar = e.clientX - barRect.left;
-      const mode = offsetInBar <= edgeZone ? "resize-start" : (barRect.width - offsetInBar <= edgeZone ? "resize-end" : "move");
       const startX = e.clientX;
       const task = state.gantt.find((t) => String(t.id) === taskId);
       if (!task) return;

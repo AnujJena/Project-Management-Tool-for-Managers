@@ -917,7 +917,7 @@ body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
 .gantt-wrap { display: flex; flex-direction: column; gap: 0; background: var(--bg-panel); border: 1px solid var(--border); border-top: 3px solid var(--border-strong); border-radius: var(--radius); padding: 16px 20px; min-width: 640px; }
 .gantt-header {
   display: grid;
-  grid-template-columns: 200px 1fr 30px;
+  grid-template-columns: 200px 1fr;
   font-family: var(--font-mono);
   font-size: 10px;
   color: var(--text-faint);
@@ -925,17 +925,28 @@ body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
   padding-bottom: 6px;
   margin-bottom: 8px;
 }
+/* Pinned left column (task name) that stays visible while scrolling a wide timeline horizontally */
+.gantt-sticky-col { position: sticky; left: -20px; padding-left: 20px; margin-left: -20px; background: var(--bg-panel); z-index: 3; }
 .gantt-scale { display: flex; }
 .gantt-scale span { flex: 1; text-align: left; border-left: 1px solid var(--border); padding-left: 4px; }
 
 .gantt-row {
   display: grid;
-  grid-template-columns: 200px 1fr 30px;
+  grid-template-columns: 200px 1fr;
   align-items: center;
   height: 40px;
   border-bottom: 1px solid var(--grid-line);
 }
-.gantt-task-name { font-size: 13px; padding-right: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gantt-task-name { font-size: 13px; padding-right: 8px; display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.gantt-task-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gantt-name-delete {
+  flex-shrink: 0;
+  background: transparent; border: 1px solid var(--border-strong); color: var(--text-faint);
+  width: 18px; height: 18px; border-radius: 3px;
+  cursor: pointer; font-size: 11px; line-height: 1;
+  display: flex; align-items: center; justify-content: center; padding: 0;
+}
+.gantt-name-delete:hover { color: var(--danger); border-color: var(--danger); }
 .gantt-track { position: relative; height: 100%; }
 .gantt-track-bg {
   position: absolute; inset: 0;
@@ -948,17 +959,45 @@ body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
   border-radius: 2px;
   background: var(--accent-dim);
   border: 1px solid var(--accent);
-  overflow: hidden;
   cursor: grab;
   touch-action: none;
 }
 .gantt-bar-fill {
+  position: relative;
   height: 100%;
   background: var(--accent);
   opacity: 0.55;
   cursor: ew-resize;
   touch-action: none;
 }
+/* Small marker sitting exactly at the filled/unfilled boundary, for a visible progress-drag handle */
+.gantt-progress-handle {
+  position: absolute; top: 0; bottom: 0; right: -3px; width: 6px;
+  background: var(--text); border-radius: 2px;
+  box-shadow: 0 0 0 1px var(--bg-page);
+}
+/* Left/right resize grips */
+.gantt-handle { position: absolute; top: 0; bottom: 0; width: 9px; cursor: ew-resize; touch-action: none; z-index: 2; }
+.gantt-handle-left { left: -3px; }
+.gantt-handle-right { right: -3px; }
+.gantt-handle::before {
+  content: ""; position: absolute; top: 50%; left: 50%;
+  width: 3px; height: 12px; background: var(--accent-2); border-radius: 2px;
+  transform: translate(-50%, -50%);
+}
+/* Small delete cross on each bar itself */
+.gantt-bar-delete {
+  position: absolute; top: -1px; right: -1px;
+  width: 15px; height: 15px;
+  border: none; border-radius: 0 2px 0 3px;
+  background: var(--bg-panel-2); color: var(--text-faint);
+  font-size: 10px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; opacity: 0; transition: opacity 0.15s ease;
+  z-index: 3;
+}
+.gantt-bar:hover .gantt-bar-delete { opacity: 1; }
+.gantt-bar-delete:hover { background: var(--danger); color: #fff; }
 .gantt-bar-label {
   position: absolute;
   top: 0; left: 8px; height: 100%;
@@ -967,6 +1006,7 @@ body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
   font-size: 10px;
   color: var(--text);
   white-space: nowrap;
+  pointer-events: none;
 }
 
 /* ---------- Burndown ---------- */
