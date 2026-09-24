@@ -1069,8 +1069,14 @@ function renderGantt(tasks) {
   const maxDate = new Date(Math.max(...dates));
   const totalDays = Math.max(1, Math.round((maxDate - minDate) / 86400000) + 1);
   const weekCount = Math.ceil(totalDays / 7);
+  const spansMultipleYears = minDate.getFullYear() !== maxDate.getFullYear();
   let scaleHtml = "";
-  for (let w = 0; w < weekCount; w++) scaleHtml += `<span>Wk ${w + 1}</span>`;
+  for (let w = 0; w < weekCount; w++) {
+    const colStart = new Date(minDate);
+    colStart.setDate(colStart.getDate() + w * 7);
+    const label = colStart.toLocaleDateString("en-US", spansMultipleYears ? { month: "short", day: "numeric", year: "numeric" } : { month: "short", day: "numeric" });
+    scaleHtml += `<span title="Week of ${label}">${label}</span>`;
+  }
 
   let rows = "";
   tasks.forEach((t) => {
