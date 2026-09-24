@@ -3,8 +3,8 @@
 // The anon key is meant to be public/embeddable — it only grants what the
 // Row Level Security policies in supabase/schema.sql allow (a user can only
 // touch their own rows).
-const SUPABASE_URL = "https://YOUR-PROJECT-REF.supabase.co";
-const SUPABASE_ANON_KEY = "YOUR-ANON-PUBLIC-KEY";
+const SUPABASE_URL = "https://zmmrkgnjiupjfxhynsgr.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptbXJrZ25qaXVwamZ4aHluc2dyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAyNDU2NzksImV4cCI6MjEwNTgyMTY3OX0.vYKcnbWhXaUnDFL3E-A1LxyCAJhUNUYDyj93FhD2Tcc";
 
 const PROJECTS_STORAGE_KEY = "trackline_projects_v1";
 
