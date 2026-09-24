@@ -81,7 +81,7 @@ Everything runs as static files plus one serverless function (`/api/chat.js`), s
    - **anon public** key
    - **service_role** key (keep this one secret — never put it in client-side code)
 4. Open `auth.js` and fill in `SUPABASE_URL` and `SUPABASE_ANON_KEY` at the top with the Project URL and anon key from step 3 (the anon key is safe to embed in client code — it only grants what the schema's Row Level Security policies allow).
-5. While this is a work in progress, it's simplest to turn off email confirmation so sign-up works immediately: **Authentication → Providers → Email**, turn off **Confirm email**. (Turn it back on later if you want verified emails before launch.)
+5. Email verification is required to use the AI assistant (see Notes below), so leave **Confirm email** turned **on**: **Authentication → Providers → Email**. Then go to **Authentication → URL Configuration** and set **Site URL** to your deployed Vercel URL (e.g. `https://trackline-yourname.vercel.app`) — otherwise confirmation links in the email will point at `localhost` and won't work for real visitors. You can revisit this after step 4 once you know your Vercel URL.
 
 ## 4. Deploy on Vercel (free)
 
@@ -94,6 +94,7 @@ Everything runs as static files plus one serverless function (`/api/chat.js`), s
    - `SUPABASE_SERVICE_ROLE_KEY` = *(service_role key from step 3 — server-side only)*
    - Optional: `ANTHROPIC_MODEL` = `claude-sonnet-5` (default) or `claude-haiku-4-5-20251001` for a cheaper/faster model
    - Optional: `CHAT_DAILY_LIMIT` = number of AI assistant messages allowed per account per day (default `20` if unset)
+   - Optional: `CHAT_WEEKLY_LIMIT_IP` = number of AI assistant requests allowed per IP address per rolling 7-day window, across all accounts on that connection (default `60` if unset) — a second layer of abuse prevention alongside the per-account limit
 5. Click **Deploy**.
 
 You'll get a free URL like `https://trackline-yourname.vercel.app`.
@@ -108,3 +109,5 @@ You'll get a free URL like `https://trackline-yourname.vercel.app`.
 - Cross-tab propagation checks add roughly one extra API call (and one AI-assistant usage count) per manual edit, so active editing sessions will use more of the daily message allowance than just chatting. There's no batching/debouncing on this yet — rapid-fire edits each get their own check.
 - The daily chat limit is enforced server-side and checked *before* calling Anthropic, so a capped user never costs you a token — they just see a message saying they've hit the limit for the day.
 - Row Level Security on the `projects` table means a signed-in user can only ever read or write their own projects, even though the client talks to Supabase directly with the public anon key.
+- Email verification is required before an account can use the AI assistant (checked server-side via Supabase's `email_confirmed_at` on every request) — everything else in the app (projects, all modules) still works on an unverified account, only the assistant is gated. This, combined with the per-IP weekly cap, is meant to raise the cost of spinning up multiple accounts to get around the per-account daily limit.
+- The per-IP cap uses Vercel's `x-forwarded-for` header and counts requests over a rolling 7-day window (not a fixed calendar week), stored in the `chat_usage_ip` table. It's deliberately looser than the per-account limit so shared networks (offices, schools, coworking spaces) aren't falsely blocked — tune `CHAT_WEEKLY_LIMIT_IP` if that tradeoff doesn't fit your situation.

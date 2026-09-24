@@ -22,10 +22,11 @@ window.TracklineAuth = {
   getAccessToken: () => (currentSession ? currentSession.access_token : null),
 };
 
-function setLoginError(msg) {
+function setLoginError(msg, showResend) {
   const el = document.getElementById("loginError");
   el.textContent = msg || "";
   el.style.display = msg ? "block" : "none";
+  document.getElementById("resendConfirmRow").style.display = showResend ? "block" : "none";
 }
 
 async function pullCloudProjects(userId) {
@@ -91,6 +92,17 @@ document.getElementById("loginPasswordToggle").addEventListener("click", () => {
   btn.setAttribute("aria-label", btn.title);
 });
 
+document.getElementById("resendConfirmLink").addEventListener("click", async (e) => {
+  e.preventDefault();
+  const email = document.getElementById("loginEmail").value.trim();
+  if (!email) { setLoginError("Enter your email above first, then click resend.", true); return; }
+  const link = document.getElementById("resendConfirmLink");
+  link.textContent = "Sending…";
+  const { error } = await supabaseClient.auth.resend({ type: "signup", email });
+  link.textContent = "Resend confirmation email";
+  setLoginError(error ? error.message : "Confirmation email sent — check your inbox.", !error);
+});
+
 // ===== Login / sign-up form =====
 let authMode = "signin"; // "signin" | "signup"
 document.getElementById("loginToggleLink").addEventListener("click", (e) => {
@@ -121,7 +133,11 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
       await completeLogin(data.session);
     } else {
       const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-      if (error) { setLoginError(error.message); return; }
+      if (error) {
+        const unconfirmed = /email.*not.*confirm/i.test(error.message);
+        setLoginError(unconfirmed ? "Please confirm your email before signing in — check your inbox for the link." : error.message, unconfirmed);
+        return;
+      }
       await completeLogin(data.session);
     }
   } catch (err) {

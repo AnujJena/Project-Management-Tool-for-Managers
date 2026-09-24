@@ -79,3 +79,38 @@ set search_path = public
 as $$
   select coalesce((select count from public.chat_usage where user_id = p_user_id and day = current_date), 0);
 $$;
+
+-- Extra abuse-prevention layer: caps AI assistant requests per IP address over
+-- a rolling 7-day window, independent of the per-account cap above, so
+-- spinning up multiple accounts from the same connection doesn't bypass the
+-- per-account limit. One row per request (not one row per IP+day) so the
+-- window can slide continuously rather than resetting at a fixed boundary.
+create table if not exists public.chat_usage_ip (
+  id bigserial primary key,
+  ip text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists chat_usage_ip_ip_idx on public.chat_usage_ip(ip, created_at);
+alter table public.chat_usage_ip enable row level security;
+
+create or replace function public.increment_ip_usage(p_ip text, p_limit int, p_window_days int default 7)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  current_count int;
+begin
+  -- Opportunistic cleanup: drop rows outside anyone's window so this table doesn't grow unbounded.
+  delete from public.chat_usage_ip where created_at < now() - ((p_window_days + 1) || ' days')::interval;
+
+  insert into public.chat_usage_ip (ip) values (p_ip);
+
+  select count(*) into current_count
+  from public.chat_usage_ip
+  where ip = p_ip and created_at >= now() - (p_window_days || ' days')::interval;
+
+  return jsonb_build_object('count', current_count, 'allowed', current_count <= p_limit);
+end;
+$$;

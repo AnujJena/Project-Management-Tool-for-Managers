@@ -5,6 +5,7 @@ const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const CHAT_DAILY_LIMIT = parseInt(process.env.CHAT_DAILY_LIMIT || "20", 10);
+const CHAT_WEEKLY_LIMIT_IP = parseInt(process.env.CHAT_WEEKLY_LIMIT_IP || "60", 10);
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
 
 const BASE_SYSTEM_PROMPT = `You are the AI Project Manager inside Trackline, a project console built specifically for construction professionals — general contractors, site supervisors, and construction PMs.
@@ -212,14 +213,38 @@ You will be told exactly what changed. Using the full current project state alre
 - If something should change, write one brief sentence per proposed change explaining why, then the json block(s) for those changes only, using the same shapes as above. These will be shown to the user as suggestions to approve, not applied automatically — so it's safe to propose them even if you're not fully certain, as long as the connection is real.
 - Keep your prose extremely brief — a sentence or two total, since this is a background check, not a conversation.`;
 
-// Verifies the caller's Supabase access token and returns their user id + email, or null if invalid.
+// Verifies the caller's Supabase access token and returns their user id + email + verification status, or null if invalid.
 async function verifyUser(accessToken) {
   const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
     headers: { Authorization: `Bearer ${accessToken}`, apikey: SUPABASE_SERVICE_ROLE_KEY },
   });
   if (!res.ok) return null;
   const user = await res.json();
-  return user && user.id ? { id: user.id, email: (user.email || "").toLowerCase() } : null;
+  return user && user.id
+    ? { id: user.id, email: (user.email || "").toLowerCase(), emailVerified: Boolean(user.email_confirmed_at) }
+    : null;
+}
+
+// Extracts the caller's IP from the headers Vercel sets on every request.
+function getClientIp(req) {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (forwarded) return forwarded.split(",")[0].trim();
+  return req.socket?.remoteAddress || "unknown";
+}
+
+// Atomically increments this IP's request count over a rolling 7-day window and reports whether it's still under the cap.
+async function checkAndIncrementIpUsage(ip) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/increment_ip_usage`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+    },
+    body: JSON.stringify({ p_ip: ip, p_limit: CHAT_WEEKLY_LIMIT_IP }),
+  });
+  if (!res.ok) throw new Error("ip usage check failed");
+  return res.json(); // { count, allowed }
 }
 
 // Atomically increments today's message count for this user and reports the new count plus whether they're still under the cap.
@@ -288,6 +313,11 @@ module.exports = async (req, res) => {
   if (!user) { res.status(401).json({ error: "Your session has expired. Please sign in again." }); return; }
 
   const isAdmin = ADMIN_EMAILS.includes(user.email);
+  if (!isAdmin && !user.emailVerified) {
+    res.status(403).json({ error: "Please verify your email before using the AI assistant — check your inbox for the confirmation link." });
+    return;
+  }
+
   let usage = isAdmin ? { unlimited: true } : null;
   if (!isAdmin) {
     try {
@@ -299,6 +329,17 @@ module.exports = async (req, res) => {
       }
     } catch (err) {
       res.status(500).json({ error: "Couldn't check your usage limit. Try again." }); return;
+    }
+
+    try {
+      const ip = getClientIp(req);
+      const ipResult = await checkAndIncrementIpUsage(ip);
+      if (!ipResult.allowed) {
+        res.status(429).json({ error: `Too many AI assistant requests from your network this week (limit: ${CHAT_WEEKLY_LIMIT_IP}). This helps prevent abuse across accounts — try again later.`, usage });
+        return;
+      }
+    } catch (err) {
+      res.status(500).json({ error: "Couldn't check network usage limits. Try again." }); return;
     }
   }
 
