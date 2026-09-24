@@ -137,6 +137,7 @@
       </div>
       <div class="chat-log" id="chatLogPage"></div>
       <form class="chat-input-row" id="chatFormPage">
+        <button type="button" class="chat-attach-btn" id="chatAttachPage" title="Populate this project from a PDF">📎</button>
         <textarea id="chatInputPage" placeholder="Ask a PM question, or describe/edit anything…" rows="2"></textarea>
         <button type="submit" id="chatSendPage">Send</button>
       </form>
@@ -278,6 +279,7 @@
         <div><h1>Project Dashboard</h1><p class="view-sub" id="dashboardSub">A live snapshot of this project — schedule, budget, open items, crew workload, materials, attendance, and machinery.</p></div>
         <div class="view-actions">
           <button class="btn-primary" id="btnSetupEntireProject">🚀 Set Up Entire Project</button>
+          <button class="btn-ghost" id="btnPopulateFromPdf" title="Upload a PDF (scope of work, RFP, schedule, etc.) and populate the relevant tabs from it">📎 Populate from PDF</button>
           <button class="btn-ghost" id="dashAutoRefresh" data-on="0">⟳ Auto-refresh: Off</button>
           <button class="btn-ghost" data-refresh="dashboard">⟳ Refresh</button>
           <button class="btn-ghost" data-export-png="dashboardWrap" data-export-name="project-dashboard">Export PNG</button>
@@ -592,6 +594,7 @@
     </div>
     <div class="chat-log" id="chatLog"></div>
     <form class="chat-input-row" id="chatForm">
+      <button type="button" class="chat-attach-btn" id="chatAttach" title="Populate this project from a PDF">📎</button>
       <textarea id="chatInput" placeholder="Ask a PM question, or describe/edit anything…" rows="2"></textarea>
       <button type="submit" id="chatSend">Send</button>
     </form>
@@ -704,6 +707,7 @@
 </div>
 
 <input type="file" id="genericXlUploadInput" accept=".xlsx,.xls" style="display:none;">
+<input type="file" id="pdfUploadInput" accept="application/pdf" style="display:none;">
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>

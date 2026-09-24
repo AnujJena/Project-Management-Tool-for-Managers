@@ -142,7 +142,9 @@ Rules for structured responses:
 - ids must be unique strings/numbers within the response.
 - EDITING an existing chart or log: you will be shown its current state below, under "Current project state". When the user asks to change, add to, remove from, or adjust something ("push framing back a week", "mark RFI-014 as answered", "add a budget line for drywall"), return the FULL updated dataset in the same json shape — not just the changed part — keeping existing ids/fields for anything not affected by the request.
 - For plain PM questions with nothing to chart or log, do not include a json block at all.
-- Never wrap normal prose in a json block.`;
+- Never wrap normal prose in a json block.
+
+Document uploads: the user may attach a PDF (a scope of work, RFP, contract, existing schedule, etc.) instead of describing the project in words. When a document is attached, read it directly and extract REAL information from it — task names and dates, actual budget figures, real team/stakeholder names, real risks or requirements it states — to populate the relevant modules using the json shapes above. Only include a json block for a module the document actually contains information for; do not invent or pad content for modules it doesn't cover, and do not fabricate numbers, names, or dates that aren't actually in the document.`;
 
 function buildSystemPrompt(charts, projectType) {
   let prompt = BASE_SYSTEM_PROMPT;

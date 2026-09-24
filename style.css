@@ -1578,6 +1578,15 @@ body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
 }
 .chat-input-row button:hover { background: #FFC93C; }
 .chat-input-row button:disabled { opacity: 0.5; cursor: default; }
+.chat-attach-btn {
+  background: var(--bg-panel-2) !important;
+  border: 1px solid var(--border-strong) !important;
+  color: var(--text-dim) !important;
+  padding: 0 12px !important;
+  font-size: 15px !important;
+  flex-shrink: 0;
+}
+.chat-attach-btn:hover { background: var(--bg-panel) !important; color: var(--accent) !important; }
 
 /* ---------- Responsive ---------- */
 @media (max-width: 980px) {

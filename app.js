@@ -3001,8 +3001,8 @@ function hideThinkingIndicator() {
     if (el) el.remove();
   });
 }
-async function sendChatMessage(text) {
-  addMessage("user", text);
+async function sendChatMessage(text, attachment) {
+  addMessage("user", attachment ? `📎 ${attachment.name}\n${text}` : text);
   history.push({ role: "user", content: text });
   CHAT_MOUNTS.forEach((m) => { const btn = document.getElementById(m.send); if (btn) btn.disabled = true; });
   showThinkingIndicator();
@@ -3010,9 +3010,17 @@ async function sendChatMessage(text) {
     const trimmedHistory = history.slice(-MAX_API_HISTORY);
     const projects = loadAllProjects();
     const projectType = (projects[activeProjectId] && projects[activeProjectId].type) || "";
+    const apiMessages = attachment
+      ? trimmedHistory.map((m, i) => i === trimmedHistory.length - 1
+          ? { role: m.role, content: [
+              { type: "document", source: { type: "base64", media_type: attachment.mediaType, data: attachment.data } },
+              { type: "text", text: m.content },
+            ] }
+          : m)
+      : trimmedHistory;
     const res = await fetch("/api/chat", {
       method: "POST", headers: chatRequestHeaders(),
-      body: JSON.stringify({ messages: trimmedHistory, charts: state, projectType }),
+      body: JSON.stringify({ messages: apiMessages, charts: state, projectType }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -3071,6 +3079,61 @@ async function setupEntireProject() {
   renderSiteOpsLive();
 }
 document.getElementById("btnSetupEntireProject").addEventListener("click", setupEntireProject);
+
+// ===== Populate from PDF (same batching approach as Set Up Entire Project, but grounded in an uploaded document) =====
+const PDF_MAX_BYTES = 3 * 1024 * 1024; // 3MB raw — base64 inflates ~33%, staying under Vercel's 4.5MB request body limit
+const DOC_SETUP_BATCHES = [
+  { label: "Schedule & Site Tasks", prompt: "Based on the attached document, extract and set up the project schedule and the site task board. Only include a json block for a module the document actually has information for." },
+  { label: "Progress & RAID Log", prompt: "Based on the attached document, extract a schedule burndown and any risks, assumptions, issues, or dependencies it mentions. Only include a json block for a module the document actually has information for." },
+  { label: "Daily Log, Submittals & Punch List", prompt: "Based on the attached document, extract any daily/site reports, submittals or RFIs, and punch list items it mentions. Only include a json block for a module the document actually has information for." },
+  { label: "Team & Budget", prompt: "Based on the attached document, extract the team/roster and budget information it mentions. Only include a json block for a module the document actually has information for." },
+  { label: "Materials, Attendance & Machinery", prompt: "Based on the attached document, extract any materials, attendance, or machinery/equipment information it mentions. Only include a json block for a module the document actually has information for." },
+  { label: "Charter & Crashing Analysis", prompt: "Based on the attached document, extract project charter details (purpose, scope, stakeholders, milestones, etc.) and any schedule-compression/crashing information it mentions. Only include a json block for a module the document actually has information for." },
+  { label: "WBS & Inventory", prompt: "Based on the attached document, extract a work breakdown structure and any inventory/stock information it mentions. Only include a json block for a module the document actually has information for." },
+];
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+async function populateFromDocument(file) {
+  if (file.type !== "application/pdf") { alert("Please choose a PDF file."); return; }
+  if (file.size > PDF_MAX_BYTES) { alert(`That PDF is too large (${(file.size / 1024 / 1024).toFixed(1)}MB) — please use one under ${PDF_MAX_BYTES / 1024 / 1024}MB.`); return; }
+  if (!confirm(`This will ask the assistant to read "${file.name}" and populate every module it finds information for, in ${DOC_SETUP_BATCHES.length} steps (${DOC_SETUP_BATCHES.length} separate requests using this document, so it costs proportionally more than one message). Continue?`)) return;
+
+  const dashboardBtn = document.getElementById("btnPopulateFromPdf");
+  const note = document.getElementById("setupProgressNote");
+  const attachBtns = [dashboardBtn, document.getElementById("chatAttach"), document.getElementById("chatAttachPage")].filter(Boolean);
+  attachBtns.forEach((b) => { b.disabled = true; });
+  if (note) note.style.display = "block";
+  try {
+    const base64 = await readFileAsBase64(file);
+    const attachment = { name: file.name, mediaType: "application/pdf", data: base64 };
+    for (let i = 0; i < DOC_SETUP_BATCHES.length; i++) {
+      if (note) note.textContent = `Reading "${file.name}": ${DOC_SETUP_BATCHES[i].label} (step ${i + 1} of ${DOC_SETUP_BATCHES.length})…`;
+      setTicker(`POPULATING FROM DOCUMENT · STEP ${i + 1} OF ${DOC_SETUP_BATCHES.length}`, true);
+      await sendChatMessage(DOC_SETUP_BATCHES[i].prompt, attachment);
+    }
+    setTicker("DOCUMENT IMPORT COMPLETE · ALL RELEVANT TABS UPDATED", true);
+    renderDashboard();
+    renderSiteOpsLive();
+  } finally {
+    if (note) note.style.display = "none";
+    attachBtns.forEach((b) => { b.disabled = false; });
+  }
+}
+document.getElementById("pdfUploadInput").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (file) populateFromDocument(file);
+});
+["btnPopulateFromPdf", "chatAttach", "chatAttachPage"].forEach((id) => {
+  const btn = document.getElementById(id);
+  if (btn) btn.addEventListener("click", () => document.getElementById("pdfUploadInput").click());
+});
 
 // ===== Landing page misc =====
 document.getElementById("brandHome").addEventListener("click", () => { persistActiveProject(); showLanding(); renderIndustryCounts(); });
