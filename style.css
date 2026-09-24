@@ -651,6 +651,8 @@ body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
 }
 #brandHome { cursor: pointer; }
 #brandHome:hover .brand-name { color: var(--accent); }
+.topbar-account { display: flex; align-items: center; gap: 12px; }
+.account-email { color: var(--text-faint); font-size: 12px; font-family: var(--font-mono); }
 
 .status-chip {
   display: flex;

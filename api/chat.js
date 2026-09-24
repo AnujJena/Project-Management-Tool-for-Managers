@@ -2,6 +2,9 @@
 // Configure ANTHROPIC_API_KEY as an environment variable in your Vercel project settings.
 
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const CHAT_DAILY_LIMIT = parseInt(process.env.CHAT_DAILY_LIMIT || "20", 10);
 
 const BASE_SYSTEM_PROMPT = `You are the AI Project Manager inside Trackline, a project console built specifically for construction professionals — general contractors, site supervisors, and construction PMs.
 
@@ -206,12 +209,60 @@ You will be told exactly what changed. Using the full current project state alre
 - If something should change, write one brief sentence per proposed change explaining why, then the json block(s) for those changes only, using the same shapes as above. These will be shown to the user as suggestions to approve, not applied automatically — so it's safe to propose them even if you're not fully certain, as long as the connection is real.
 - Keep your prose extremely brief — a sentence or two total, since this is a background check, not a conversation.`;
 
+// Verifies the caller's Supabase access token and returns their user id, or null if invalid.
+async function verifyUser(accessToken) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    headers: { Authorization: `Bearer ${accessToken}`, apikey: SUPABASE_SERVICE_ROLE_KEY },
+  });
+  if (!res.ok) return null;
+  const user = await res.json();
+  return user && user.id ? user.id : null;
+}
+
+// Atomically increments today's message count for this user and reports whether they're still under the cap.
+async function checkAndIncrementUsage(userId) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/increment_chat_usage`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+    },
+    body: JSON.stringify({ p_user_id: userId, p_limit: CHAT_DAILY_LIMIT }),
+  });
+  if (!res.ok) throw new Error("usage check failed");
+  return res.json(); // boolean: true if still within the daily limit
+}
+
 module.exports = async (req, res) => {
   if (req.method === "GET") { res.status(200).json({ configured: Boolean(process.env.ANTHROPIC_API_KEY) }); return; }
   if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) { res.status(500).json({ error: "ANTHROPIC_API_KEY is not configured on the server." }); return; }
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) { res.status(500).json({ error: "Accounts are not configured on the server." }); return; }
+
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (!token) { res.status(401).json({ error: "Sign in to use the AI assistant." }); return; }
+
+  let userId;
+  try {
+    userId = await verifyUser(token);
+  } catch (err) {
+    res.status(500).json({ error: "Couldn't verify your session. Try again." }); return;
+  }
+  if (!userId) { res.status(401).json({ error: "Your session has expired. Please sign in again." }); return; }
+
+  try {
+    const withinLimit = await checkAndIncrementUsage(userId);
+    if (!withinLimit) {
+      res.status(429).json({ error: `You've reached today's AI assistant limit (${CHAT_DAILY_LIMIT} messages). It resets at midnight.` });
+      return;
+    }
+  } catch (err) {
+    res.status(500).json({ error: "Couldn't check your usage limit. Try again." }); return;
+  }
 
   try {
     const { messages, charts, projectType, mode } = req.body || {};

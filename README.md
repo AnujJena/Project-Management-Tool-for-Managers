@@ -9,7 +9,7 @@ A project console built for construction, marketing research, and consulting pro
 
 The AI assistant is briefed on all of this — ask it to draft a submittal on a Consulting project and it'll write a client deliverable, not an RFI.
 
-**Access:** there's no login — the app opens straight to a **home page** where you pick which kind of project you're working on: Construction, Marketing Research, or Consulting. Each card shows how many projects you have of that type and takes you to a filtered project list; "All Projects" in the header shows everything at once. The ⚙ Trackline logo always takes you back to this home page.
+**Access:** you sign up / sign in with an email and password. Once signed in, the app opens to a **home page** where you pick which kind of project you're working on: Construction, Marketing Research, or Consulting. Each card shows how many projects you have of that type and takes you to a filtered project list; "All Projects" in the header shows everything at once. The ⚙ Trackline logo always takes you back to this home page. Your email and a "Log out" link/button appear in the landing header and the app's top bar.
 
 **Navigation:** all 17 modules live in a collapsible left sidebar (not a top tab bar), labeled "TRACKLINE" in its header. Click the ☰ button to pin it open or collapsed; collapsed shows icons only, and hovering over it temporarily pops it open without changing the pinned state — a dedicated pin button (next to the label) appears during that preview so you can lock it open without having to first move your mouse away. It remembers your last choice across visits (via this browser's local storage) and defaults to collapsed the very first time you open the app. If there are more items than fit vertically, the icon list scrolls on its own. The header block above the content (brand, project selector, status ticker) auto-hides when you scroll down within a tab and reappears when you scroll back up, to reclaim vertical space.
 
@@ -49,7 +49,7 @@ The in-workspace assistant is a collapsible floating chat window (bottom-right c
 
 Every project has a **type** (Residential / Commercial / Infrastructure) picked when you create it, which the assistant uses to tailor its advice.
 
-Everything runs as static files plus one serverless function (`/api/chat.js`), so it fits Vercel's free Hobby tier with no database and no build step. All project data is saved in your browser's local storage — private to that browser/device.
+Everything runs as static files plus one serverless function (`/api/chat.js`), so it fits Vercel's free Hobby tier with no build step. Accounts and projects are stored in a free [Supabase](https://supabase.com) Postgres database (see setup step 3 below); a copy of your active project is also cached in your browser's local storage for speed and offline resilience. The AI assistant is capped to a limited number of messages per account per day (default 20, configurable) so usage can't run away with your API budget while this is a work in progress.
 
 ---
 
@@ -72,24 +72,39 @@ Everything runs as static files plus one serverless function (`/api/chat.js`), s
    git push -u origin main
    ```
 
-## 3. Deploy on Vercel (free)
+## 3. Set up accounts (Supabase)
+
+1. Go to [supabase.com](https://supabase.com), sign up, and create a new free project.
+2. Open **SQL Editor → New query**, paste in the contents of [`supabase/schema.sql`](supabase/schema.sql), and run it. This creates the `projects` table (where accounts' project data lives), the `chat_usage` table, and the rate-limit function.
+3. Go to **Project Settings → API** and copy three values:
+   - **Project URL**
+   - **anon public** key
+   - **service_role** key (keep this one secret — never put it in client-side code)
+4. Open `auth.js` and fill in `SUPABASE_URL` and `SUPABASE_ANON_KEY` at the top with the Project URL and anon key from step 3 (the anon key is safe to embed in client code — it only grants what the schema's Row Level Security policies allow).
+5. While this is a work in progress, it's simplest to turn off email confirmation so sign-up works immediately: **Authentication → Providers → Email**, turn off **Confirm email**. (Turn it back on later if you want verified emails before launch.)
+
+## 4. Deploy on Vercel (free)
 
 1. Go to [vercel.com](https://vercel.com) and sign up (the free Hobby plan is enough).
 2. **Add New → Project** → import the GitHub repo.
 3. Framework preset: **Other** (no build step needed).
 4. Under **Environment Variables**, add:
    - `ANTHROPIC_API_KEY` = *(your key from step 1)*
+   - `SUPABASE_URL` = *(Project URL from step 3)*
+   - `SUPABASE_SERVICE_ROLE_KEY` = *(service_role key from step 3 — server-side only)*
    - Optional: `ANTHROPIC_MODEL` = `claude-sonnet-5` (default) or `claude-haiku-4-5-20251001` for a cheaper/faster model
+   - Optional: `CHAT_DAILY_LIMIT` = number of AI assistant messages allowed per account per day (default `20` if unset)
 5. Click **Deploy**.
 
 You'll get a free URL like `https://trackline-yourname.vercel.app`.
 
 ## Notes
 
-- The API key only ever lives on the server (`api/chat.js`) — never sent to the browser, so it's safe to deploy publicly.
-- Floor plan images are resized to a max width of 1600px and compressed before being stored in localStorage — this keeps things reasonable, but browsers cap localStorage at roughly 5–10MB per site, so avoid uploading many large images.
+- The Anthropic API key and the Supabase service role key only ever live on the server (`api/chat.js`) — never sent to the browser, so it's safe to deploy publicly. The Supabase anon key in `auth.js` is meant to be public.
+- Floor plan images are resized to a max width of 1600px and compressed before being stored — this keeps things reasonable, but browsers cap localStorage at roughly 5–10MB per site, so avoid uploading many large images.
 - To change the assistant's tone or the construction knowledge it draws on, edit `BASE_SYSTEM_PROMPT` in `api/chat.js`.
 - Free-tier Vercel functions have a 10-second timeout; if you raise `max_tokens` a lot, very long replies could occasionally hit that limit.
-- Costs: Anthropic bills per API call based on tokens used, not Vercel (static hosting + serverless functions are free at this scale).
-- Cross-tab propagation checks add roughly one extra API call per manual edit, so active editing sessions will use more tokens than just chatting. There's no batching/debouncing on this yet — rapid-fire edits each get their own check.
-- All of this still runs on the same architecture as before: static files, one serverless function, and browser localStorage — no database, no user accounts, no login. That was an explicit choice to keep this free and simple rather than production-grade in the traditional sense. There's no access control at all now, so don't put anything sensitive in a publicly-shared deployment.
+- Costs: Anthropic bills per API call based on tokens used, and Supabase's free tier covers auth + a small Postgres database at this scale; Vercel static hosting + serverless functions are also free at this scale.
+- Cross-tab propagation checks add roughly one extra API call (and one AI-assistant usage count) per manual edit, so active editing sessions will use more of the daily message allowance than just chatting. There's no batching/debouncing on this yet — rapid-fire edits each get their own check.
+- The daily chat limit is enforced server-side and checked *before* calling Anthropic, so a capped user never costs you a token — they just see a message saying they've hit the limit for the day.
+- Row Level Security on the `projects` table means a signed-in user can only ever read or write their own projects, even though the client talks to Supabase directly with the public anon key.
