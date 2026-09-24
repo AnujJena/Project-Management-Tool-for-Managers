@@ -1127,9 +1127,10 @@ function renderGantt(tasks) {
         <div class="gantt-track">
           <div class="gantt-track-bg"></div>
           <div class="gantt-bar" data-task-id="${t.id}" style="left:${leftPct}%; width:${widthPct}%;" title="Drag the middle to move, the edges to resize">
-            <div class="gantt-bar-fill" style="width:${t.progress || 0}%;" title="Drag to set progress"><span class="gantt-progress-handle"></span></div>
+            <div class="gantt-bar-fill" style="width:${t.progress || 0}%;" title="Drag to set progress"></div>
             <div class="gantt-handle gantt-handle-left" title="Drag to change start date"></div>
             <div class="gantt-handle gantt-handle-right" title="Drag to change end date"></div>
+            <div class="gantt-progress-handle" style="left:calc(${t.progress || 0}% - 3px);" title="Drag to set progress"></div>
             <button class="gantt-bar-delete" data-del="gantt:${t.id}" title="Delete task">×</button>
           </div>
           <div class="gantt-bar-label" style="left:calc(${leftPct}% + 8px); max-width:calc(${Math.max(0, 100 - leftPct)}% - 12px);">${escapeHtml(t.name)} · ${t.progress || 0}%</div>
@@ -1146,6 +1147,7 @@ function attachGanttDragEvents(minDate, totalDays) {
     const taskId = barEl.dataset.taskId;
     const track = barEl.parentElement;
     const fillEl = barEl.querySelector(".gantt-bar-fill");
+    const progressHandleEl = barEl.querySelector(".gantt-progress-handle");
 
     barEl.addEventListener("dblclick", (e) => {
       if (e.target.closest(".gantt-bar-delete")) return;
@@ -1153,7 +1155,7 @@ function attachGanttDragEvents(minDate, totalDays) {
     });
 
     barEl.addEventListener("pointerdown", (e) => {
-      if (e.target.closest(".gantt-bar-fill") || e.target.closest(".gantt-bar-delete")) return; // handled by their own listeners
+      if (e.target.closest(".gantt-bar-fill") || e.target.closest(".gantt-bar-delete") || e.target.closest(".gantt-progress-handle")) return; // handled by their own listeners
       const mode = e.target.closest(".gantt-handle-left") ? "resize-start" : e.target.closest(".gantt-handle-right") ? "resize-end" : "move";
       const trackRect = track.getBoundingClientRect();
       const pxPerDay = trackRect.width / totalDays;
@@ -1205,30 +1207,35 @@ function attachGanttDragEvents(minDate, totalDays) {
       barEl.addEventListener("pointerup", onUp, { once: true });
     });
 
-    if (fillEl) {
-      fillEl.addEventListener("pointerdown", (e) => {
-        e.stopPropagation();
-        const barRect = barEl.getBoundingClientRect();
-        fillEl.setPointerCapture(e.pointerId);
-        function pctFromEvent(ev) { return Math.max(0, Math.min(100, Math.round(((ev.clientX - barRect.left) / barRect.width) * 100))); }
-        function onMove(ev) { fillEl.style.width = pctFromEvent(ev) + "%"; }
-        function onUp(ev) {
-          fillEl.releasePointerCapture(e.pointerId);
-          fillEl.removeEventListener("pointermove", onMove);
-          const pct = pctFromEvent(ev);
-          const task = state.gantt.find((t) => String(t.id) === taskId);
-          if (task) {
-            const oldProgress = task.progress || 0;
-            task.progress = pct;
-            renderGantt(state.gantt);
-            persistActiveProject();
-            if (pct !== oldProgress) triggerPropagationCheck(`Changed progress on task "${task.name}" from ${oldProgress}% to ${pct}%.`);
-          }
+    function startProgressDrag(e) {
+      e.stopPropagation();
+      const grabEl = e.currentTarget;
+      const barRect = barEl.getBoundingClientRect();
+      grabEl.setPointerCapture(e.pointerId);
+      function pctFromEvent(ev) { return Math.max(0, Math.min(100, Math.round(((ev.clientX - barRect.left) / barRect.width) * 100))); }
+      function onMove(ev) {
+        const pct = pctFromEvent(ev);
+        if (fillEl) fillEl.style.width = pct + "%";
+        if (progressHandleEl) progressHandleEl.style.left = `calc(${pct}% - 3px)`;
+      }
+      function onUp(ev) {
+        grabEl.releasePointerCapture(e.pointerId);
+        grabEl.removeEventListener("pointermove", onMove);
+        const pct = pctFromEvent(ev);
+        const task = state.gantt.find((t) => String(t.id) === taskId);
+        if (task) {
+          const oldProgress = task.progress || 0;
+          task.progress = pct;
+          renderGantt(state.gantt);
+          persistActiveProject();
+          if (pct !== oldProgress) triggerPropagationCheck(`Changed progress on task "${task.name}" from ${oldProgress}% to ${pct}%.`);
         }
-        fillEl.addEventListener("pointermove", onMove);
-        fillEl.addEventListener("pointerup", onUp, { once: true });
-      });
+      }
+      grabEl.addEventListener("pointermove", onMove);
+      grabEl.addEventListener("pointerup", onUp, { once: true });
     }
+    if (fillEl) fillEl.addEventListener("pointerdown", startProgressDrag);
+    if (progressHandleEl) progressHandleEl.addEventListener("pointerdown", startProgressDrag);
   });
 }
 

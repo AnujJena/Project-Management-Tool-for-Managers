@@ -971,19 +971,24 @@ body[data-theme="neutral"] .hazard-strip { background: var(--accent); }
   cursor: ew-resize;
   touch-action: none;
 }
-/* Small marker sitting exactly at the filled/unfilled boundary, for a visible progress-drag handle */
+/* Small marker at the progress boundary, positioned by JS via inline `left` (independent of the
+   fill element's own width) so it's always reachable, including at 0% and 100% progress.
+   Confined to the bottom band of the bar so it never spatially overlaps the resize handles below,
+   even when it sits exactly at the bar's left/right edge. */
 .gantt-progress-handle {
-  position: absolute; top: 0; bottom: 0; right: -3px; width: 6px;
+  position: absolute; bottom: 0; height: 8px; width: 6px;
   background: var(--text); border-radius: 2px;
   box-shadow: 0 0 0 1px var(--bg-page);
+  cursor: ew-resize; touch-action: none;
+  z-index: 3;
 }
-/* Left/right resize grips */
-.gantt-handle { position: absolute; top: 0; bottom: 0; width: 9px; cursor: ew-resize; touch-action: none; z-index: 2; }
+/* Left/right resize grips — confined to the top band of the bar (see .gantt-progress-handle above) */
+.gantt-handle { position: absolute; top: 0; height: 14px; width: 9px; cursor: ew-resize; touch-action: none; z-index: 2; }
 .gantt-handle-left { left: -3px; }
 .gantt-handle-right { right: -3px; }
 .gantt-handle::before {
   content: ""; position: absolute; top: 50%; left: 50%;
-  width: 3px; height: 12px; background: var(--accent-2); border-radius: 2px;
+  width: 3px; height: 10px; background: var(--accent-2); border-radius: 2px;
   transform: translate(-50%, -50%);
 }
 /* Small delete cross on each bar itself */
