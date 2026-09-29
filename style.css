@@ -1632,6 +1632,23 @@ a { color: var(--accent); text-decoration: none; }
   .feature-grid-secondary { grid-template-columns: 1fr; }
 }
 
+/* Bug fix: the app shell (topbar, project bar, view headers, landing nav) used
+   flex-nowrap with flex-shrink:0 action groups, which don't fit a phone-width
+   viewport. Since an ancestor clips overflow (#appView { overflow: hidden }),
+   the excess content was silently cut off rather than wrapping or scrolling —
+   invisible instead of just ugly. Letting these rows wrap fixes that. */
+@media (max-width: 760px) {
+  .topbar { flex-wrap: wrap; row-gap: 10px; }
+  .topbar-search { order: 3; max-width: none; width: 100%; }
+  .topbar-links { order: 2; }
+  .project-bar { flex-wrap: wrap; row-gap: 8px; }
+  .view-head { flex-wrap: wrap; }
+  .view-actions { flex-shrink: 1; justify-content: flex-start; }
+  .landing-nav { flex-wrap: wrap; row-gap: 10px; }
+  .sub-header { flex-wrap: wrap; row-gap: 8px; }
+  .browse-head, .browse-wrap .browse-head { flex-wrap: wrap; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
