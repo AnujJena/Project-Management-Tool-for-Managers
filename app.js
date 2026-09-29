@@ -11,7 +11,7 @@ let state = {
   team: null, timesheets: null, budget: null,
   materials: null, attendance: null, machinery: null,
   charter: null, crashing: null, wbs: null, inventory: null, floorplan: null,
-  findings: null, billing: null,
+  findings: null, billing: null, automationRules: [],
 };
 let history = [];
 let chatLogData = [];
@@ -19,6 +19,9 @@ let burndownChartInstance = null;
 let materialChartInstance = null;
 let dashAutoRefreshTimer = null;
 let activeProjectId = null;
+let activeProjectRole = "owner"; // "owner" | "editor" | "viewer" — see applyRoleGating()
+let activeProjectOwnerId = null;
+let realtimeChannel = null;
 let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
@@ -169,6 +172,58 @@ function applyTierVisibility(tier) {
     if (activeTab && activeTab.classList.contains("tier-hidden")) switchView("dashboard");
   }
 }
+
+// ===== Collaboration roles (owner / editor / viewer) =====
+// Real enforcement is server-side (RLS in supabase/schema.sql only lets
+// owners+editors write); this just hides controls a viewer can't use anyway,
+// and stops the owner-only project management buttons showing for guests.
+function isProjectOwner() {
+  const session = window.TracklineAuth && window.TracklineAuth.getSession();
+  return !session || !activeProjectOwnerId || session.user.id === activeProjectOwnerId;
+}
+function applyRoleGating(role) {
+  document.body.classList.toggle("role-viewer", role === "viewer");
+  const owner = isProjectOwner();
+  const renameBtn = document.getElementById("btnRenameProject");
+  const deleteBtn = document.getElementById("btnDeleteProject");
+  if (renameBtn) renameBtn.style.display = owner ? "" : "none";
+  if (deleteBtn) deleteBtn.style.display = owner ? "" : "none";
+  const badge = document.getElementById("roleBadge");
+  if (badge) {
+    if (owner) { badge.style.display = "none"; }
+    else { badge.style.display = ""; badge.textContent = role; badge.className = "role-badge role-" + role; }
+  }
+}
+
+// ===== Real-time sync: notice when a collaborator updates the project we're viewing =====
+function subscribeRealtime(projectId) {
+  const client = window.TracklineAuth && window.TracklineAuth.client;
+  if (realtimeChannel) { client && client.removeChannel(realtimeChannel); realtimeChannel = null; }
+  if (!client || !projectId) return;
+  realtimeChannel = client
+    .channel("project-" + projectId)
+    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "projects", filter: "id=eq." + projectId }, () => {
+      // Ignore the echo of our own recent save.
+      if (Date.now() - (TracklineCloud.getLastSaveAt ? TracklineCloud.getLastSaveAt() : 0) < 3000) return;
+      document.getElementById("realtimeBanner").style.display = "flex";
+    })
+    .subscribe();
+}
+document.getElementById("realtimeReloadBtn").addEventListener("click", async () => {
+  const client = window.TracklineAuth && window.TracklineAuth.client;
+  if (!client || !activeProjectId) return;
+  const { data, error } = await client.from("projects").select("data").eq("id", activeProjectId).single();
+  document.getElementById("realtimeBanner").style.display = "none";
+  if (error || !data) return;
+  const projects = loadAllProjects();
+  const merged = { ...data.data, _ownerId: activeProjectOwnerId, _role: activeProjectRole };
+  projects[activeProjectId] = merged;
+  saveAllProjectsLocal(projects);
+  loadProjectIntoApp(merged);
+});
+document.getElementById("realtimeDismissBtn").addEventListener("click", () => {
+  document.getElementById("realtimeBanner").style.display = "none";
+});
 
 const SAMPLES = {
   gantt: [
@@ -567,6 +622,7 @@ document.getElementById("addItemCancel").addEventListener("click", closeAddModal
 document.querySelectorAll("[data-add-type]").forEach((btn) => { btn.addEventListener("click", () => openAddModal(btn.dataset.addType)); });
 
 document.getElementById("addItemSubmit").addEventListener("click", () => {
+  if (activeProjectRole === "viewer") { closeAddModal(); return; }
   const type = document.getElementById("addItemModalOverlay").dataset.type;
   const editId = document.getElementById("addItemModalOverlay").dataset.editId;
   const val = (id) => { const el = document.getElementById(`af-${id}`); return el ? el.value.trim() : ""; };
@@ -731,6 +787,7 @@ document.addEventListener("click", (e) => {
   deleteItem(type, id);
 });
 function deleteItem(type, id) {
+  if (activeProjectRole === "viewer") return;
   if (type === "gantt") { state.gantt = state.gantt.filter((t) => String(t.id) !== id); renderGantt(state.gantt); }
   else if (type === "kanban") { state.kanban.columns.forEach((col) => { col.cards = col.cards.filter((c) => c.id !== id); }); renderKanban(state.kanban); }
   else if (type === "raid") { state.raid.items = state.raid.items.filter((i) => i.id !== id); renderRaid(state.raid); }
@@ -782,7 +839,17 @@ function setSyncStatus(status) {
 
 const TracklineCloud = (function () {
   let lastIds = new Set();
+  let lastSaveAt = 0;
   function setInitialIds(ids) { lastIds = new Set(ids); }
+  function getLastSaveAt() { return lastSaveAt; }
+  // Strips the local-only ownership/role metadata (_ownerId, _role, ...) before
+  // sending a project's data to Supabase — those fields are derived from
+  // project_members on every pull, not part of the project's own content.
+  function stripLocalMeta(p) {
+    const clean = {};
+    Object.keys(p).forEach((k) => { if (!k.startsWith("_")) clean[k] = p[k]; });
+    return clean;
+  }
   async function syncProjects(projects) {
     const auth = window.TracklineAuth;
     const session = auth && auth.getSession();
@@ -796,22 +863,26 @@ const TracklineCloud = (function () {
 
     const deletedIds = [...lastIds].filter((id) => !nextIds.has(id));
     for (const id of deletedIds) {
+      // Only the owner can actually delete a project row (RLS); a departing
+      // member's stray attempt here just no-ops server-side, which is fine.
       tasks.push(client.from("projects").delete().eq("id", id).eq("user_id", userId));
     }
 
-    const rows = Object.entries(projects).map(([id, p]) => ({
-      id, user_id: userId, name: p.name || "Untitled Project", type: p.type || "",
-      data: p, updated_at: new Date().toISOString(),
-    }));
-    if (rows.length) tasks.push(client.from("projects").upsert(rows));
+    // Upsert via RPC (not a raw table upsert) so a collaborator saving a shared
+    // project never reassigns ownership — see upsert_project() in schema.sql.
+    Object.entries(projects).forEach(([id, p]) => {
+      tasks.push(client.rpc("upsert_project", {
+        p_id: id, p_name: p.name || "Untitled Project", p_type: p.type || "", p_data: stripLocalMeta(p),
+      }));
+    });
 
     lastIds = nextIds;
     const results = await Promise.allSettled(tasks);
     const failed = results.some((r) => r.status === "rejected" || (r.value && r.value.error));
     if (failed) { results.forEach((r) => { if (r.value && r.value.error) console.error("Cloud sync failed", r.value.error); }); setSyncStatus("error"); }
-    else setSyncStatus("synced");
+    else { lastSaveAt = Date.now(); setSyncStatus("synced"); }
   }
-  return { setInitialIds, syncProjects };
+  return { setInitialIds, syncProjects, getLastSaveAt };
 })();
 window.TracklineCloud = TracklineCloud;
 
@@ -828,7 +899,7 @@ function newProjectState(name, type, tier) {
       charter: null, crashing: null, wbs: null, inventory: null, floorplan: null,
       findings: null, billing: null,
     },
-    apiHistory: [], chatLog: [], updatedAt: Date.now(),
+    apiHistory: [], chatLog: [], automationRules: [], updatedAt: Date.now(),
   };
 }
 function initProjects() {
@@ -868,6 +939,12 @@ function loadProjectIntoApp(project) {
   state.billing = project.charts.billing || null;
   history = project.apiHistory ? [...project.apiHistory] : [];
   chatLogData = project.chatLog ? [...project.chatLog] : [];
+  state.automationRules = project.automationRules || [];
+
+  activeProjectRole = project._role || "owner";
+  activeProjectOwnerId = project._ownerId || null;
+  applyRoleGating(activeProjectRole);
+  subscribeRealtime(activeProjectId);
 
   applyIndustryLabels(industryFromType(project.type));
   applyTierVisibility(project.tier || "full");
@@ -910,6 +987,7 @@ function persistActiveProject() {
   };
   projects[activeProjectId].apiHistory = history;
   projects[activeProjectId].chatLog = chatLogData;
+  projects[activeProjectId].automationRules = state.automationRules;
   projects[activeProjectId].updatedAt = Date.now();
   saveAllProjects(projects);
 }
@@ -957,6 +1035,89 @@ document.getElementById("btnDeleteProject").addEventListener("click", () => {
   localStorage.setItem(ACTIVE_KEY, nextId);
   loadProjectIntoApp(projects[nextId]);
   renderProjectSelector();
+});
+
+// ===== Share project (invite collaborators) =====
+function shareClient() { return window.TracklineAuth && window.TracklineAuth.client; }
+function shareMyUserId() { const s = window.TracklineAuth && window.TracklineAuth.getSession(); return s ? s.user.id : null; }
+function setShareError(msg) {
+  const el = document.getElementById("shareModalError");
+  el.textContent = msg || "";
+  el.style.display = msg ? "block" : "none";
+}
+async function renderShareMembers() {
+  const client = shareClient();
+  const list = document.getElementById("shareMemberList");
+  const note = document.getElementById("shareModalNote");
+  const inviteForm = document.getElementById("shareInviteForm");
+  const owner = isProjectOwner();
+  inviteForm.style.display = owner ? "" : "none";
+  if (!client) { list.innerHTML = ""; return; }
+
+  const { data, error } = await client.from("project_members").select("user_id,email,role").eq("project_id", activeProjectId);
+  if (error) { list.innerHTML = `<p class="login-note">Couldn't load collaborators.</p>`; return; }
+  const members = data || [];
+  note.textContent = owner
+    ? "Invite an existing Trackline account to collaborate on this project."
+    : "You have " + activeProjectRole + " access to this project.";
+
+  const rows = [];
+  if (!owner) {
+    rows.push(`<div class="share-member-row"><span class="share-member-email">Owner</span><button class="btn-tiny" id="shareLeaveBtn">Leave project</button></div>`);
+  }
+  members.forEach((m) => {
+    const isMe = m.user_id === shareMyUserId();
+    rows.push(`<div class="share-member-row">
+      <span class="share-member-email">${escapeHtml(m.email)}${isMe ? " (you)" : ""}</span>
+      ${owner
+        ? `<select data-role-for="${m.user_id}"><option value="editor" ${m.role === "editor" ? "selected" : ""}>Editor</option><option value="viewer" ${m.role === "viewer" ? "selected" : ""}>Viewer</option></select>
+           <button class="row-delete-btn" data-remove-member="${m.user_id}" title="Remove">×</button>`
+        : `<span class="role-badge">${escapeHtml(m.role)}</span>`}
+    </div>`);
+  });
+  list.innerHTML = rows.join("") || `<p class="login-note">No collaborators yet.</p>`;
+
+  const leaveBtn = document.getElementById("shareLeaveBtn");
+  if (leaveBtn) leaveBtn.addEventListener("click", async () => {
+    if (!confirm("Leave this project? You'll lose access to it.")) return;
+    await client.from("project_members").delete().eq("project_id", activeProjectId).eq("user_id", shareMyUserId());
+    const projects = loadAllProjects();
+    delete projects[activeProjectId];
+    saveAllProjectsLocal(projects);
+    const nextId = Object.keys(projects)[0];
+    if (nextId) { activeProjectId = nextId; localStorage.setItem(ACTIVE_KEY, nextId); loadProjectIntoApp(projects[nextId]); }
+    renderProjectSelector();
+    document.getElementById("shareModalOverlay").style.display = "none";
+  });
+  list.querySelectorAll("[data-role-for]").forEach((sel) => {
+    sel.addEventListener("change", async () => {
+      await client.from("project_members").update({ role: sel.value }).eq("project_id", activeProjectId).eq("user_id", sel.dataset.roleFor);
+    });
+  });
+  list.querySelectorAll("[data-remove-member]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      await client.from("project_members").delete().eq("project_id", activeProjectId).eq("user_id", btn.dataset.removeMember);
+      renderShareMembers();
+    });
+  });
+}
+document.getElementById("btnShareProject").addEventListener("click", () => {
+  setShareError("");
+  document.getElementById("shareModalOverlay").style.display = "flex";
+  renderShareMembers();
+});
+document.getElementById("shareModalClose").addEventListener("click", () => { document.getElementById("shareModalOverlay").style.display = "none"; });
+document.getElementById("shareInviteSubmit").addEventListener("click", async () => {
+  const client = shareClient();
+  const email = document.getElementById("shareInviteEmail").value.trim();
+  const role = document.getElementById("shareInviteRole").value;
+  if (!email) { setShareError("Enter an email address."); return; }
+  setShareError("");
+  const { data, error } = await client.rpc("invite_member", { p_project_id: activeProjectId, p_email: email, p_role: role });
+  if (error) { setShareError(error.message); return; }
+  if (data && data.error) { setShareError(data.error); return; }
+  document.getElementById("shareInviteEmail").value = "";
+  renderShareMembers();
 });
 
 function createProjectAndOpen(name, type, tier, tab, goToApp = true) {
@@ -1427,20 +1588,96 @@ function statusRadioGroup(module, id, options, current) {
   </div>`;
 }
 document.addEventListener("change", (e) => {
+  if (activeProjectRole === "viewer") return;
   const input = e.target.closest(".status-radio-group input[type=radio]");
   if (!input) return;
   const group = input.closest(".status-radio-group");
   updateItemStatus(group.dataset.statusModule, group.dataset.statusId, input.value);
 });
+// Field used as "{item}" in an automation rule's note, per module.
+const AUTOMATION_ITEM_NAME_FIELD = { raid: "description", submittals: "subject", punchlist: "description", machine: "name", attendance: "memberName" };
 function updateItemStatus(module, id, newStatus) {
-  if (module === "raid") { const item = (state.raid.items || []).find((i) => i.id === id); if (item) { item.status = newStatus; renderRaid(state.raid); } }
-  else if (module === "submittals") { const item = (state.submittals.items || []).find((i) => i.id === id); if (item) { item.status = newStatus; renderSubmittals(state.submittals); } }
-  else if (module === "punchlist") { const item = (state.punchlist.items || []).find((i) => i.id === id); if (item) { item.status = newStatus; renderPunchlist(state.punchlist); } }
-  else if (module === "machine") { const item = (state.machinery.items || []).find((i) => i.id === id); if (item) { item.status = newStatus; renderSiteOps(); renderSiteOpsLive(); } }
-  else if (module === "attendance") { const rec = (state.attendance.records || []).find((r) => r.id === id); if (rec) { rec.status = newStatus; renderSiteOps(); renderSiteOpsLive(); } }
+  let oldStatus = null, item = null;
+  if (module === "raid") { item = (state.raid.items || []).find((i) => i.id === id); if (item) { oldStatus = item.status; item.status = newStatus; renderRaid(state.raid); } }
+  else if (module === "submittals") { item = (state.submittals.items || []).find((i) => i.id === id); if (item) { oldStatus = item.status; item.status = newStatus; renderSubmittals(state.submittals); } }
+  else if (module === "punchlist") { item = (state.punchlist.items || []).find((i) => i.id === id); if (item) { oldStatus = item.status; item.status = newStatus; renderPunchlist(state.punchlist); } }
+  else if (module === "machine") { item = (state.machinery.items || []).find((i) => i.id === id); if (item) { oldStatus = item.status; item.status = newStatus; renderSiteOps(); renderSiteOpsLive(); } }
+  else if (module === "attendance") { item = (state.attendance.records || []).find((r) => r.id === id); if (item) { oldStatus = item.status; item.status = newStatus; renderSiteOps(); renderSiteOpsLive(); } }
+  if (item && oldStatus !== newStatus) runAutomationRules(module, item, oldStatus, newStatus);
   persistActiveProject();
   triggerPropagationCheck(`Changed a ${MODULE_LABEL_FOR_TYPE[module] || module} item's status to "${newStatus}".`);
 }
+
+// ===== Automation rules ("when status becomes X, post a note") =====
+const AUTOMATION_STATUS_OPTIONS = {
+  raid: ["Open", "Monitoring", "Mitigated", "Closed"],
+  submittals: ["Open", "Answered", "Approved", "Rejected", "Revise & Resubmit"],
+  punchlist: ["Open", "In Progress", "Complete", "Verified"],
+  machine: ["Available", "In Use", "Down"],
+  attendance: ["Present", "Absent"],
+};
+function runAutomationRules(module, item, oldStatus, newStatus) {
+  const rules = state.automationRules || [];
+  const itemName = item[AUTOMATION_ITEM_NAME_FIELD[module]] || "This item";
+  rules.forEach((rule) => {
+    if (!rule.enabled || rule.module !== module || rule.statusEquals !== newStatus) return;
+    const text = (rule.message || "{item} status changed").replace(/\{item\}/g, itemName);
+    addNote(`⚡ ${text}`, module);
+  });
+}
+function renderAutomationStatusOptions() {
+  const moduleSel = document.getElementById("automationModule");
+  const statusSel = document.getElementById("automationStatus");
+  const options = AUTOMATION_STATUS_OPTIONS[moduleSel.value] || [];
+  statusSel.innerHTML = options.map((o) => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join("");
+}
+function renderAutomationRuleList() {
+  const list = document.getElementById("automationRuleList");
+  const rules = state.automationRules || [];
+  if (!rules.length) { list.innerHTML = `<p class="login-note">No automation rules yet.</p>`; return; }
+  list.innerHTML = rules.map((r) => `
+    <div class="automation-rule-row">
+      <input type="checkbox" data-automation-toggle="${r.id}" ${r.enabled ? "checked" : ""} title="Enable/disable">
+      <span class="automation-rule-text">When <strong>${escapeHtml(MODULE_LABEL_FOR_TYPE[r.module] || r.module)}</strong> status becomes <strong>${escapeHtml(r.statusEquals)}</strong> → note: "${escapeHtml(r.message)}"</span>
+      <button class="row-delete-btn" data-automation-delete="${r.id}" title="Delete rule">×</button>
+    </div>`).join("");
+  list.querySelectorAll("[data-automation-toggle]").forEach((cb) => {
+    cb.addEventListener("change", () => {
+      const rule = (state.automationRules || []).find((r) => r.id === cb.dataset.automationToggle);
+      if (rule) { rule.enabled = cb.checked; persistActiveProject(); }
+    });
+  });
+  list.querySelectorAll("[data-automation-delete]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.automationRules = (state.automationRules || []).filter((r) => r.id !== btn.dataset.automationDelete);
+      persistActiveProject();
+      renderAutomationRuleList();
+    });
+  });
+}
+function openAutomationModal() {
+  renderAutomationStatusOptions();
+  renderAutomationRuleList();
+  document.getElementById("automationModalOverlay").style.display = "flex";
+}
+document.getElementById("btnAutomationRules").addEventListener("click", openAutomationModal);
+document.getElementById("automationModalClose").addEventListener("click", () => { document.getElementById("automationModalOverlay").style.display = "none"; });
+document.getElementById("automationModule").addEventListener("change", renderAutomationStatusOptions);
+document.getElementById("automationRuleAdd").addEventListener("click", () => {
+  const message = document.getElementById("automationMessage").value.trim();
+  if (!message) { alert("Please enter a note to post."); return; }
+  if (!state.automationRules) state.automationRules = [];
+  state.automationRules.push({
+    id: "ar" + Date.now(),
+    enabled: true,
+    module: document.getElementById("automationModule").value,
+    statusEquals: document.getElementById("automationStatus").value,
+    message,
+  });
+  document.getElementById("automationMessage").value = "";
+  persistActiveProject();
+  renderAutomationRuleList();
+});
 
 function renderRaid(data) {
   state.raid = data;
@@ -3116,6 +3353,7 @@ function hideThinkingIndicator() {
   });
 }
 async function sendChatMessage(text, attachment) {
+  if (activeProjectRole === "viewer") { addMessage("assistant", "You have view-only access to this project, so the AI assistant is disabled here."); return; }
   addMessage("user", attachment ? `📎 ${attachment.name}\n${text}` : text);
   history.push({ role: "user", content: text });
   CHAT_MOUNTS.forEach((m) => { const btn = document.getElementById(m.send); if (btn) btn.disabled = true; });

@@ -291,8 +291,16 @@
   <select id="projectSelect"></select>
   <span class="project-type-badge" id="projectTypeBadge"></span>
   <button class="btn-tiny" id="btnNewProject" title="New project">＋ New</button>
+  <button class="btn-tiny" id="btnShareProject" title="Share this project">👥 Share</button>
   <button class="btn-tiny" id="btnRenameProject" title="Rename project">Rename</button>
   <button class="btn-tiny btn-tiny-danger" id="btnDeleteProject" title="Delete project">Delete</button>
+  <span class="role-badge" id="roleBadge" style="display:none;"></span>
+</div>
+
+<div id="realtimeBanner" class="realtime-banner" style="display:none;">
+  <span>🔄 A collaborator updated this project.</span>
+  <button class="btn-tiny" id="realtimeReloadBtn">Reload</button>
+  <button class="btn-tiny" id="realtimeDismissBtn">Dismiss</button>
 </div>
 
 <div class="ticker" id="ticker"><span class="ticker-text" id="tickerText">SYSTEM READY · ASK THE ASSISTANT TO PLAN, TRACK, OR CHART YOUR PROJECT</span></div>
@@ -307,6 +315,7 @@
         <div class="view-actions">
           <button class="btn-primary" id="btnSetupEntireProject">🚀 Set Up Entire Project</button>
           <button class="btn-ghost" id="btnPopulateFromPdf" title="Upload a PDF (scope of work, RFP, schedule, etc.) and populate the relevant tabs from it">📎 Populate from PDF</button>
+          <button class="btn-ghost" id="btnAutomationRules" title="Set up 'when status changes to X, post a note' rules">⚡ Automation</button>
           <button class="btn-ghost" id="dashAutoRefresh" data-on="0">⟳ Auto-refresh: Off</button>
           <button class="btn-ghost" data-refresh="dashboard">⟳ Refresh</button>
           <button class="btn-ghost" data-export-png="dashboardWrap" data-export-name="project-dashboard">Export PNG</button>
@@ -729,6 +738,57 @@
     <div class="modal-actions">
       <button class="btn-secondary" id="proposedUpdatesDismiss">Dismiss</button>
       <button class="btn-primary" id="proposedUpdatesApply">Apply Selected</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SHARE PROJECT MODAL ===================== -->
+<div class="modal-overlay" id="shareModalOverlay" style="display:none;">
+  <div class="modal-box" style="max-width:440px;">
+    <h2>Share Project</h2>
+    <p class="login-note" id="shareModalNote"></p>
+    <div id="shareMemberList"></div>
+    <div id="shareInviteForm">
+      <label for="shareInviteEmail">Invite by email</label>
+      <input type="email" id="shareInviteEmail" placeholder="teammate@example.com">
+      <label for="shareInviteRole">Role</label>
+      <select id="shareInviteRole">
+        <option value="editor">Editor — can view and edit</option>
+        <option value="viewer">Viewer — can only view</option>
+      </select>
+      <p class="login-note" style="margin-top:10px;">They need an existing Trackline account — no invite email is sent yet.</p>
+    </div>
+    <p class="login-error" id="shareModalError" style="display:none;"></p>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="shareModalClose">Close</button>
+      <button class="btn-primary" id="shareInviteSubmit">Invite</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== AUTOMATION RULES MODAL ===================== -->
+<div class="modal-overlay" id="automationModalOverlay" style="display:none;">
+  <div class="modal-box" style="max-width:480px;">
+    <h2>⚡ Automation Rules</h2>
+    <p class="login-note">When an item's status changes, automatically post a note to this project's activity log.</p>
+    <div id="automationRuleList"></div>
+    <div id="automationRuleForm">
+      <label for="automationModule">Module</label>
+      <select id="automationModule">
+        <option value="raid">RAID Log</option>
+        <option value="submittals">Submittals &amp; RFIs</option>
+        <option value="punchlist">Punch List</option>
+        <option value="machine">Machinery</option>
+        <option value="attendance">Attendance</option>
+      </select>
+      <label for="automationStatus">When status becomes</label>
+      <select id="automationStatus"></select>
+      <label for="automationMessage">Post this note (use {item} for the item's name)</label>
+      <input type="text" id="automationMessage" placeholder="e.g. {item} needs follow-up">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="automationModalClose">Close</button>
+      <button class="btn-primary" id="automationRuleAdd">Add Rule</button>
     </div>
   </div>
 </div>

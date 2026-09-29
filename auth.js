@@ -30,10 +30,27 @@ function setLoginError(msg, showResend) {
 }
 
 async function pullCloudProjects(userId) {
-  const { data, error } = await supabaseClient.from("projects").select("id,data").eq("user_id", userId);
-  if (error) { console.error("Failed to load projects from Supabase", error); return {}; }
   const projects = {};
-  (data || []).forEach((row) => { projects[row.id] = row.data; });
+
+  const { data: owned, error: ownedErr } = await supabaseClient.from("projects").select("id,user_id,data").eq("user_id", userId);
+  if (ownedErr) { console.error("Failed to load owned projects from Supabase", ownedErr); return {}; }
+  (owned || []).forEach((row) => {
+    projects[row.id] = { ...row.data, _ownerId: row.user_id, _role: "owner" };
+  });
+
+  const { data: memberships, error: memberErr } = await supabaseClient.from("project_members").select("project_id,role").eq("user_id", userId);
+  if (memberErr) { console.error("Failed to load shared-project memberships", memberErr); return projects; }
+  const memberProjectIds = (memberships || []).map((m) => m.project_id);
+  if (memberProjectIds.length) {
+    const { data: shared, error: sharedErr } = await supabaseClient.from("projects").select("id,user_id,data").in("id", memberProjectIds);
+    if (sharedErr) { console.error("Failed to load shared projects from Supabase", sharedErr); return projects; }
+    const roleById = {};
+    (memberships || []).forEach((m) => { roleById[m.project_id] = m.role; });
+    (shared || []).forEach((row) => {
+      projects[row.id] = { ...row.data, _ownerId: row.user_id, _role: roleById[row.id] || "viewer" };
+    });
+  }
+
   return projects;
 }
 

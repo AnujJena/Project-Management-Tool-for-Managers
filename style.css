@@ -103,6 +103,43 @@ a { color: var(--accent); text-decoration: none; }
 /* Tier-gated tabs: hidden via JS when the project's chosen feature set doesn't include them */
 .sidebar-nav-list .tab.tier-hidden { display: none !important; }
 
+/* ================= Viewer role (read-only collaborators) =================
+   Real enforcement is server-side (RLS only lets owners/editors write — see
+   supabase/schema.sql); this is UX only, hiding controls a viewer can't use. */
+body.role-viewer [data-add-type],
+body.role-viewer .row-delete-btn,
+body.role-viewer .gantt-name-delete,
+body.role-viewer .gantt-bar-delete,
+body.role-viewer .gantt-handle,
+body.role-viewer .gantt-progress-handle,
+body.role-viewer .floorplan-room-delete,
+body.role-viewer .floorplan-room-handle,
+body.role-viewer [data-xl-upload],
+body.role-viewer #btnSetupEntireProject,
+body.role-viewer #btnPopulateFromPdf,
+body.role-viewer .status-radio-option input,
+body.role-viewer #chatForm,
+body.role-viewer #chatFormPage,
+body.role-viewer .chat-attach-btn {
+  display: none !important;
+}
+body.role-viewer .gantt-bar,
+body.role-viewer .gantt-milestone,
+body.role-viewer .kanban-card,
+body.role-viewer .floorplan-room {
+  pointer-events: none;
+  cursor: default;
+}
+body.role-viewer .status-radio-option { cursor: default; }
+body.role-viewer .chat-log::after {
+  content: "You have view-only access to this project — the AI assistant is disabled here.";
+  display: block;
+  padding: 12px 16px;
+  font-size: 12px;
+  color: var(--text-faint);
+  text-align: center;
+}
+
 /* ================= Login gate ================= */
 #loginView { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
 .login-box {
@@ -817,6 +854,42 @@ a { color: var(--accent); text-decoration: none; }
 }
 .btn-tiny:hover { color: var(--accent); border-color: var(--accent); }
 .btn-tiny-danger:hover { color: var(--danger); border-color: var(--danger); }
+
+.role-badge {
+  font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--text-faint); border: 1px solid var(--border-strong); border-radius: 100px;
+  padding: 3px 9px;
+}
+.role-badge.role-editor { color: var(--accent); border-color: var(--accent); }
+.role-badge.role-viewer { color: var(--accent-2); border-color: var(--accent-2); }
+
+.realtime-banner {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 22px;
+  background: var(--accent-dim);
+  border-bottom: 1px solid var(--accent);
+  font-size: 12.5px;
+  color: var(--text);
+}
+.realtime-banner span { flex: 1; }
+
+/* ---------- Share / Automation modal lists ---------- */
+.share-member-row, .automation-rule-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.share-member-row:last-child, .automation-rule-row:last-child { border-bottom: none; }
+.share-member-email { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.automation-rule-text { flex: 1; font-size: 12.5px; color: var(--text-dim); }
+.automation-rule-text strong { color: var(--text); }
+.modal-box .share-member-row input[type="checkbox"], .modal-box .automation-rule-row input[type="checkbox"] {
+  width: auto; flex: none;
+}
+.modal-box .share-member-row select {
+  width: auto; flex: none; padding: 5px 8px; font-size: 12px;
+}
 
 /* ---------- Ticker ---------- */
 .ticker {

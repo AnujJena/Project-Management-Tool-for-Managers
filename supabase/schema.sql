@@ -16,22 +16,151 @@ create index if not exists projects_user_id_idx on public.projects(user_id);
 
 alter table public.projects enable row level security;
 
-create policy "Users can view their own projects"
+-- Collaborators invited onto a project. role='editor' can read/write everything
+-- except renaming/deleting the project or managing who's invited; role='viewer'
+-- can only read. This table (and the policies below that reference it) is what
+-- makes shared projects possible — see invite_member() further down.
+create table if not exists public.project_members (
+  project_id text not null references public.projects(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  email text not null,
+  role text not null check (role in ('editor', 'viewer')),
+  added_at timestamptz not null default now(),
+  primary key (project_id, user_id)
+);
+create index if not exists project_members_user_id_idx on public.project_members(user_id);
+alter table public.project_members enable row level security;
+
+create policy "Owners and members can view membership"
+  on public.project_members for select
+  using (
+    auth.uid() = user_id
+    or exists (select 1 from public.projects p where p.id = project_members.project_id and p.user_id = auth.uid())
+  );
+
+create policy "Owners manage membership"
+  on public.project_members for insert
+  with check (exists (select 1 from public.projects p where p.id = project_members.project_id and p.user_id = auth.uid()));
+
+create policy "Owners update membership"
+  on public.project_members for update
+  using (exists (select 1 from public.projects p where p.id = project_members.project_id and p.user_id = auth.uid()))
+  with check (exists (select 1 from public.projects p where p.id = project_members.project_id and p.user_id = auth.uid()));
+
+create policy "Owners remove members, members remove themselves"
+  on public.project_members for delete
+  using (
+    auth.uid() = user_id
+    or exists (select 1 from public.projects p where p.id = project_members.project_id and p.user_id = auth.uid())
+  );
+
+-- Superseded by the membership-aware policies below (dropped so re-running
+-- this script against an already-set-up project doesn't leave redundant
+-- owner-only policies sitting alongside the new ones).
+drop policy if exists "Users can view their own projects" on public.projects;
+drop policy if exists "Users can update their own projects" on public.projects;
+drop policy if exists "Users can delete their own projects" on public.projects;
+
+create policy "Owners and members can view projects"
   on public.projects for select
-  using (auth.uid() = user_id);
+  using (
+    auth.uid() = user_id
+    or exists (select 1 from public.project_members pm where pm.project_id = projects.id and pm.user_id = auth.uid())
+  );
 
 create policy "Users can insert their own projects"
   on public.projects for insert
   with check (auth.uid() = user_id);
 
-create policy "Users can update their own projects"
+create policy "Owners and editors can update projects"
   on public.projects for update
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using (
+    auth.uid() = user_id
+    or exists (select 1 from public.project_members pm where pm.project_id = projects.id and pm.user_id = auth.uid() and pm.role = 'editor')
+  )
+  with check (
+    auth.uid() = user_id
+    or exists (select 1 from public.project_members pm where pm.project_id = projects.id and pm.user_id = auth.uid() and pm.role = 'editor')
+  );
 
-create policy "Users can delete their own projects"
+create policy "Only owners can delete projects"
   on public.projects for delete
   using (auth.uid() = user_id);
+
+-- Upserts a project without ever changing its owner (user_id) on conflict — the
+-- client used to do a raw upsert that always set user_id to the CURRENT caller,
+-- which would silently reassign ownership if a collaborator ever saved a shared
+-- project. security invoker (the default) means RLS above still applies per-caller.
+create or replace function public.upsert_project(p_id text, p_name text, p_type text, p_data jsonb)
+returns void
+language plpgsql
+set search_path = public
+as $$
+begin
+  insert into public.projects (id, user_id, name, type, data, updated_at)
+  values (p_id, auth.uid(), p_name, p_type, p_data, now())
+  on conflict (id) do update set
+    name = excluded.name,
+    type = excluded.type,
+    data = excluded.data,
+    updated_at = now();
+end;
+$$;
+
+-- Invites an existing Trackline account (by email) onto a project as an editor
+-- or viewer. security definer is required here to look up auth.users by email,
+-- which regular roles can't query directly — this is Supabase's documented
+-- pattern for email-based invites. No email is sent; the invitee must already
+-- have an account (consistent with the rest of this app having no email service).
+create or replace function public.invite_member(p_project_id text, p_email text, p_role text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_user_id uuid;
+  is_owner boolean;
+begin
+  if p_role not in ('editor', 'viewer') then
+    return jsonb_build_object('error', 'Invalid role.');
+  end if;
+
+  select exists(select 1 from public.projects where id = p_project_id and user_id = auth.uid()) into is_owner;
+  if not is_owner then
+    return jsonb_build_object('error', 'Only the project owner can invite collaborators.');
+  end if;
+
+  select id into target_user_id from auth.users where lower(email) = lower(p_email) limit 1;
+  if target_user_id is null then
+    return jsonb_build_object('error', 'No Trackline account found for that email — ask them to sign up first, then invite them.');
+  end if;
+
+  if target_user_id = auth.uid() then
+    return jsonb_build_object('error', 'You already own this project.');
+  end if;
+
+  insert into public.project_members (project_id, user_id, email, role)
+  values (p_project_id, target_user_id, lower(p_email), p_role)
+  on conflict (project_id, user_id) do update set role = excluded.role;
+
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+-- Live sync: lets collaborators see each other's changes without a manual reload.
+-- Wrapped so re-running this script is safe (ALTER PUBLICATION ... ADD TABLE
+-- errors if the table is already in the publication).
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'projects'
+  ) then
+    alter publication supabase_realtime add table public.projects;
+  end if;
+end;
+$$;
 
 -- Tracks how many chat/AI-assistant requests each user has made today.
 -- No client-facing RLS policy — this table is only touched server-side
