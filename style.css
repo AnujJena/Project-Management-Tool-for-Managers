@@ -902,6 +902,18 @@ a { color: var(--accent); text-decoration: none; }
 .stat-card .stat-label { font-family: var(--font-label); font-weight: 600; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint); margin-bottom: 8px; }
 .stat-card .stat-value { font-family: var(--font-display); font-size: 30px; color: var(--text); line-height: 1; }
 .stat-card .stat-sub { font-size: 11.5px; color: var(--text-dim); margin-top: 6px; }
+.schedule-status-pill {
+  display: inline-block;
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 100px;
+}
+.schedule-status-ahead { color: var(--success); background: rgba(16,126,62,0.12); }
+.schedule-status-on-track { color: var(--accent); background: var(--accent-dim); }
+.schedule-status-behind { color: var(--danger); background: rgba(187,0,0,0.10); }
 .stat-card.warn .stat-value { color: var(--accent); }
 .stat-card.bad .stat-value { color: var(--danger); }
 .stat-card.good .stat-value { color: var(--success); }
@@ -995,6 +1007,24 @@ a { color: var(--accent); text-decoration: none; }
   cursor: ew-resize;
   touch-action: none;
 }
+/* Status color-coding: at a glance, red = needs attention, green = done, default blue = on track */
+.gantt-bar.gantt-bar-overdue { background: var(--accent-2-dim); border-color: var(--danger); }
+.gantt-bar.gantt-bar-overdue .gantt-bar-fill { background: var(--danger); }
+.gantt-bar.gantt-bar-complete { border-color: var(--success); }
+.gantt-bar.gantt-bar-complete .gantt-bar-fill { background: var(--success); }
+/* Milestones: zero-duration diamond markers, dragged to reschedule (no resize/progress handles) */
+.gantt-milestone {
+  position: absolute;
+  top: 6px; width: 16px; height: 16px;
+  margin-left: -8px;
+  background: var(--accent-purple);
+  border: 1px solid var(--accent-purple);
+  border-radius: 3px;
+  transform: rotate(45deg);
+  cursor: grab;
+  touch-action: none;
+}
+.gantt-milestone .gantt-bar-delete { transform: rotate(-45deg); top: -7px; right: -7px; }
 /* Small marker at the progress boundary, positioned by JS via inline `left` (independent of the
    fill element's own width) so it's always reachable, including at 0% and 100% progress.
    Confined to the bottom band of the bar so it never spatially overlaps the resize handles below,

@@ -28,6 +28,7 @@ Project schedule (Gantt):
 \`\`\`json
 {"action":"gantt","data":[{"id":1,"name":"Task name","start":"YYYY-MM-DD","end":"YYYY-MM-DD","progress":0}]}
 \`\`\`
+(optional: add "milestone":true for a zero-duration milestone marker — e.g. "Permit approved", "Foundation inspection passed". A milestone only needs "start" — set "end" equal to "start" and "progress" to 0. Use milestones sparingly, only for real go/no-go checkpoints the user mentions or that are standard for this kind of project, not for every task.)
 
 Schedule burndown:
 \`\`\`json

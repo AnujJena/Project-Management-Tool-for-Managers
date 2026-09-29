@@ -382,8 +382,12 @@ const FIELD_BUILDERS = {
   gantt: () => `
     ${fieldRow("Task name", `<input type="text" id="af-name" placeholder="e.g. Rough-in electrical">`)}
     ${fieldRow("Start date", `<input type="date" id="af-start">`)}
-    ${fieldRow("End date", `<input type="date" id="af-end">`)}
-    ${fieldRow("Progress (%)", `<input type="number" id="af-progress" min="0" max="100" value="0">`)}
+    <div id="af-end-row">${fieldRow("End date", `<input type="date" id="af-end">`)}</div>
+    <div id="af-progress-row">${fieldRow("Progress (%)", `<input type="number" id="af-progress" min="0" max="100" value="0">`)}</div>
+    <label style="display:flex; align-items:center; gap:7px; margin-top:12px; cursor:pointer;">
+      <input type="checkbox" id="af-milestone" style="width:auto; accent-color:var(--accent);">
+      <span style="font-family:var(--font-label); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-faint);">This is a milestone (single date, no duration)</span>
+    </label>
   `,
   kanban: () => {
     const cols = state.kanban.columns.map((c) => c.name);
@@ -527,14 +531,27 @@ function openAddModal(type, editId) {
   document.getElementById("addItemModalTitle").textContent = editId != null ? `Edit ${addTitleFor(type).replace(/^Add /, "")}` : addTitleFor(type);
   document.getElementById("addItemSubmit").textContent = editId != null ? "Save" : "Add";
 
-  if (type === "gantt" && editId != null) {
-    const task = state.gantt.find((t) => String(t.id) === String(editId));
-    if (task) {
-      document.getElementById("af-name").value = task.name;
-      document.getElementById("af-start").value = task.start;
-      document.getElementById("af-end").value = task.end;
-      document.getElementById("af-progress").value = task.progress || 0;
+  if (type === "gantt") {
+    const milestoneCheckbox = document.getElementById("af-milestone");
+    const endRow = document.getElementById("af-end-row");
+    const progressRow = document.getElementById("af-progress-row");
+    const syncMilestoneFields = () => {
+      const isMs = milestoneCheckbox.checked;
+      endRow.style.display = isMs ? "none" : "";
+      progressRow.style.display = isMs ? "none" : "";
+    };
+    milestoneCheckbox.addEventListener("change", syncMilestoneFields);
+    if (editId != null) {
+      const task = state.gantt.find((t) => String(t.id) === String(editId));
+      if (task) {
+        document.getElementById("af-name").value = task.name;
+        document.getElementById("af-start").value = task.start;
+        document.getElementById("af-end").value = task.end;
+        document.getElementById("af-progress").value = task.progress || 0;
+        milestoneCheckbox.checked = Boolean(task.milestone);
+      }
     }
+    syncMilestoneFields();
   }
 
   overlay.style.display = "flex";
@@ -555,16 +572,18 @@ document.getElementById("addItemSubmit").addEventListener("click", () => {
   const val = (id) => { const el = document.getElementById(`af-${id}`); return el ? el.value.trim() : ""; };
 
   if (type === "gantt") {
-    const name = val("name"), start = val("start"), end = val("end");
-    if (!name || !start || !end) { alert("Please fill in task name, start date, and end date."); return; }
-    if (end < start) { alert("End date can't be before the start date."); return; }
-    const progress = Math.max(0, Math.min(100, Number(val("progress")) || 0));
+    const isMilestone = document.getElementById("af-milestone").checked;
+    const name = val("name"), start = val("start");
+    const end = isMilestone ? start : val("end");
+    if (!name || !start || (!isMilestone && !end)) { alert(`Please fill in task name, start date${isMilestone ? "" : ", and end date"}.`); return; }
+    if (!isMilestone && end < start) { alert("End date can't be before the start date."); return; }
+    const progress = isMilestone ? 0 : Math.max(0, Math.min(100, Number(val("progress")) || 0));
     if (editId != null) {
       const task = state.gantt.find((t) => String(t.id) === String(editId));
-      if (task) { task.name = name; task.start = start; task.end = end; task.progress = progress; }
+      if (task) { task.name = name; task.start = start; task.end = end; task.progress = progress; task.milestone = isMilestone; }
     } else {
       const nextId = state.gantt.length ? Math.max(...state.gantt.map((t) => Number(t.id) || 0)) + 1 : 1;
-      state.gantt.push({ id: nextId, name, start, end, progress });
+      state.gantt.push({ id: nextId, name, start, end, progress, milestone: isMilestone });
     }
     renderGantt(state.gantt);
   } else if (type === "kanban") {
@@ -1130,12 +1149,33 @@ function renderGantt(tasks) {
     scaleHtml += `<span title="Week of ${label}">${label}</span>`;
   }
 
+  const todayStr = todayISO();
   let rows = "";
   tasks.forEach((t) => {
     const startOffset = Math.round((new Date(t.start) - minDate) / 86400000);
     const durDays = Math.max(1, Math.round((new Date(t.end) - new Date(t.start)) / 86400000) + 1);
     const leftPct = (startOffset / totalDays) * 100;
     const widthPct = (durDays / totalDays) * 100;
+    const isComplete = (t.progress || 0) >= 100;
+    const isOverdue = !isComplete && t.end < todayStr;
+    const statusClass = isComplete ? "gantt-bar-complete" : isOverdue ? "gantt-bar-overdue" : "";
+    if (t.milestone) {
+      rows += `
+      <div class="gantt-row">
+        <div class="gantt-task-name gantt-sticky-col" title="${escapeHtml(t.name)} (double-click to edit)">
+          <span class="gantt-task-name-text" data-edit-task="${t.id}">◆ ${escapeHtml(t.name)}</span>
+          <button class="gantt-name-delete" data-del="gantt:${t.id}" title="Delete milestone">×</button>
+        </div>
+        <div class="gantt-track">
+          <div class="gantt-track-bg"></div>
+          <div class="gantt-milestone" data-task-id="${t.id}" style="left:${leftPct}%;" title="Milestone — drag to reschedule">
+            <button class="gantt-bar-delete" data-del="gantt:${t.id}" title="Delete milestone">×</button>
+          </div>
+          <div class="gantt-bar-label" style="left:calc(${leftPct}% + 12px); max-width:calc(${Math.max(0, 100 - leftPct)}% - 16px);">${escapeHtml(t.name)}</div>
+        </div>
+      </div>`;
+      return;
+    }
     rows += `
       <div class="gantt-row">
         <div class="gantt-task-name gantt-sticky-col" title="${escapeHtml(t.name)} (double-click to edit)">
@@ -1144,7 +1184,7 @@ function renderGantt(tasks) {
         </div>
         <div class="gantt-track">
           <div class="gantt-track-bg"></div>
-          <div class="gantt-bar" data-task-id="${t.id}" style="left:${leftPct}%; width:${widthPct}%;" title="Drag the middle to move, the edges to resize">
+          <div class="gantt-bar ${statusClass}" data-task-id="${t.id}" style="left:${leftPct}%; width:${widthPct}%;" title="Drag the middle to move, the edges to resize${isOverdue ? " — overdue" : isComplete ? " — complete" : ""}">
             <div class="gantt-bar-fill" style="width:${t.progress || 0}%;" title="Drag to set progress"></div>
             <div class="gantt-handle gantt-handle-left" title="Drag to change start date"></div>
             <div class="gantt-handle gantt-handle-right" title="Drag to change end date"></div>
@@ -1254,6 +1294,47 @@ function attachGanttDragEvents(minDate, totalDays) {
     }
     if (fillEl) fillEl.addEventListener("pointerdown", startProgressDrag);
     if (progressHandleEl) progressHandleEl.addEventListener("pointerdown", startProgressDrag);
+  });
+
+  document.querySelectorAll(".gantt-milestone").forEach((msEl) => {
+    const taskId = msEl.dataset.taskId;
+    const track = msEl.parentElement;
+    msEl.addEventListener("dblclick", (e) => {
+      if (e.target.closest(".gantt-bar-delete")) return;
+      openAddModal("gantt", taskId);
+    });
+    msEl.addEventListener("pointerdown", (e) => {
+      if (e.target.closest(".gantt-bar-delete")) return;
+      const trackRect = track.getBoundingClientRect();
+      const pxPerDay = trackRect.width / totalDays;
+      const startX = e.clientX;
+      const task = state.gantt.find((t) => String(t.id) === taskId);
+      if (!task) return;
+      const origStart = new Date(task.start);
+      msEl.setPointerCapture(e.pointerId);
+      document.body.style.cursor = "grabbing";
+      function onMove(ev) {
+        const deltaDays = Math.round((ev.clientX - startX) / pxPerDay);
+        const newStart = new Date(origStart); newStart.setDate(newStart.getDate() + deltaDays);
+        const leftOffset = Math.round((newStart - minDate) / 86400000);
+        msEl.style.left = ((leftOffset / totalDays) * 100) + "%";
+      }
+      function onUp(ev) {
+        msEl.releasePointerCapture(e.pointerId);
+        document.body.style.cursor = "";
+        msEl.removeEventListener("pointermove", onMove);
+        const deltaDays = Math.round((ev.clientX - startX) / pxPerDay);
+        if (deltaDays === 0) return;
+        const newStart = new Date(origStart); newStart.setDate(newStart.getDate() + deltaDays);
+        const oldDate = task.start;
+        task.start = task.end = newStart.toISOString().slice(0, 10);
+        renderGantt(state.gantt);
+        persistActiveProject();
+        triggerPropagationCheck(`Rescheduled milestone "${task.name}": now ${task.start} (was ${oldDate}).`);
+      }
+      msEl.addEventListener("pointermove", onMove);
+      msEl.addEventListener("pointerup", onUp, { once: true });
+    });
   });
 }
 
@@ -2315,6 +2396,22 @@ function renderDashboard() {
   const today = todayISO();
   const overdue = tasks.filter((t) => t.end < today && (t.progress || 0) < 100).length;
 
+  // Schedule status (ahead/on track/behind): expected progress if work were spread evenly
+  // across the schedule's full date range, vs. actual average progress — the same "slippage"
+  // idea used by dedicated PM tools, without needing a formal baseline snapshot.
+  let scheduleStatus = null;
+  if (tasks.length) {
+    const allDates = tasks.flatMap((t) => [new Date(t.start), new Date(t.end)]);
+    const spanStart = new Date(Math.min(...allDates));
+    const spanEnd = new Date(Math.max(...allDates));
+    const spanDays = Math.max(1, Math.round((spanEnd - spanStart) / 86400000));
+    const elapsedDays = Math.min(spanDays, Math.max(0, Math.round((new Date(today) - spanStart) / 86400000)));
+    const expectedProgress = Math.round((elapsedDays / spanDays) * 100);
+    const delta = (avgProgress || 0) - expectedProgress;
+    scheduleStatus = delta >= 8 ? "ahead" : delta <= -8 ? "behind" : "on-track";
+  }
+  const SCHEDULE_STATUS_LABEL = { ahead: "▲ Ahead of schedule", "on-track": "● On track", behind: "▼ Behind schedule" };
+
   const budgetItems = (state.budget && state.budget.items) || [];
   const totalEst = budgetItems.reduce((n, i) => n + Number(i.estimated || 0), 0);
   const totalAct = budgetItems.reduce((n, i) => n + Number(i.actual || 0), 0);
@@ -2360,6 +2457,7 @@ function renderDashboard() {
         <div class="stat-label">Schedule</div>
         <div class="stat-value">${avgProgress === null ? "—" : avgProgress + "%"}</div>
         <div class="stat-sub">${tasks.length} task${tasks.length === 1 ? "" : "s"}${overdue ? ` · ${overdue} overdue` : ""}</div>
+        ${scheduleStatus ? `<span class="schedule-status-pill schedule-status-${scheduleStatus}">${SCHEDULE_STATUS_LABEL[scheduleStatus]}</span>` : ""}
       </div>
       <div class="stat-card${budgetVar > 0 ? " bad" : budgetVar < 0 ? " good" : ""}"><span class="stat-icon">${STAT_ICONS.budget}</span>
         <div class="stat-label">Budget Variance</div>
